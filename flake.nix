@@ -18,8 +18,8 @@
   };
 
   nixConfig = {
-    extra-trusted-public-keys = "eigenvalue.cachix.org-1:ykerQDDa55PGxU25CETy9wF6uVDpadGGXYrFNJA3TUs=";
-    extra-substituters = "https://eigenvalue.cachix.org";
+    # extra-trusted-public-keys = "eigenvalue.cachix.org-1:ykerQDDa55PGxU25CETy9wF6uVDpadGGXYrFNJA3TUs=";
+    # extra-substituters = "https://eigenvalue.cachix.org";
     allow-import-from-derivation = true;
   };
 
