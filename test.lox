@@ -1,0 +1,5 @@
+// this is a comment
+(( )){} // grouping stuff
+"hi there" 1 42 123.41
+!*+-/=<> <= == // operators
+var foo = 123;
