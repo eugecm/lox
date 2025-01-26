@@ -48,6 +48,12 @@ pub struct Token<'a> {
     line: usize,
 }
 
+impl<'a> Token<'a> {
+    pub fn new(typ: TokenType, lexeme: &'a str, line: usize) -> Self {
+        Self { typ, lexeme, line }
+    }
+}
+
 impl Display for Token<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.write_str(self.lexeme)

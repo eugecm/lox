@@ -4,6 +4,7 @@ use clap::Parser;
 use eyre::Result;
 
 mod scanner;
+mod syntax;
 use scanner::Scanner;
 
 #[derive(Parser, Debug)]
