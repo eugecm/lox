@@ -43,8 +43,8 @@ impl<'a> Scanner<'a> {
 
 #[derive(Debug)]
 pub struct Token<'a> {
-    typ: TokenType,
-    lexeme: &'a str,
+    pub typ: TokenType,
+    pub lexeme: &'a str,
     line: usize,
 }
 

@@ -25,11 +25,10 @@ fn main() -> Result<()> {
 fn run_file<P: AsRef<Path>>(input_file: P) -> Result<()> {
     let contents = std::fs::read_to_string(input_file)?;
     let scanner = Scanner::new(&contents);
+    let mut parser = syntax::Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
+    let ast = parser.parse();
 
-    for token in scanner.scan_tokens() {
-        let token = token.unwrap();
-        println!("{token:?}");
-    }
+    println!("{ast}");
 
     Ok(())
 }
