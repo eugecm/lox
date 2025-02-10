@@ -1,12 +1,12 @@
 use eyre::Context;
-use std::{fmt::Display, iter::Peekable};
+use std::{borrow::Cow, fmt::Display, iter::Peekable};
 
-use crate::scanner::{Token, TokenType, Tokens};
+use crate::scanner::{Token, TokenType};
 
-#[derive(Debug)]
+#[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'a> {
     Identifier(&'a str),
-    String(&'a str),
+    String(Cow<'a, str>),
     Number(f64),
     Boolean(bool),
     Null, // eww
@@ -170,7 +170,7 @@ where
                 ),
             },
             TokenType::String => Expr::Literal {
-                value: Literal::String(token.lexeme),
+                value: Literal::String(Cow::Borrowed(token.lexeme)),
             },
 
             TokenType::LeftParen => {

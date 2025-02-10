@@ -3,6 +3,7 @@ use std::path::Path;
 use clap::Parser;
 use eyre::Result;
 
+mod eval;
 mod scanner;
 mod syntax;
 use scanner::Scanner;
@@ -27,8 +28,8 @@ fn run_file<P: AsRef<Path>>(input_file: P) -> Result<()> {
     let scanner = Scanner::new(&contents);
     let mut parser = syntax::Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
     let ast = parser.parse();
-
-    println!("{ast}");
+    let result = eval::eval(&ast);
+    println!("{result}");
 
     Ok(())
 }
