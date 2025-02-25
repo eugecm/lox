@@ -4,8 +4,10 @@ use clap::Parser;
 use eyre::Result;
 
 mod eval;
+mod interpreter;
 mod scanner;
 mod syntax;
+use interpreter::Interpreter;
 use scanner::Scanner;
 
 #[derive(Parser, Debug)]
@@ -28,8 +30,8 @@ fn run_file<P: AsRef<Path>>(input_file: P) -> Result<()> {
     let scanner = Scanner::new(&contents);
     let mut parser = syntax::Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
     let ast = parser.parse();
-    let result = eval::eval(&ast);
-    println!("{result}");
+    let mut interpreter = Interpreter::new();
+    interpreter.interpret(ast);
 
     Ok(())
 }

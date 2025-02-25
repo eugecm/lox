@@ -3,27 +3,25 @@ use std::{borrow::Cow, fmt::Display, iter::Peekable};
 
 use crate::scanner::{Token, TokenType};
 
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal<'a> {
-    Identifier(&'a str),
-    String(Cow<'a, str>),
-    Number(f64),
-    Boolean(bool),
-    Null, // eww
+/// The AST for the program is represented as an enum
+#[derive(Debug)]
+pub enum Program<'a> {
+    Declarations(Vec<Declaration<'a>>),
 }
 
-impl Display for Literal<'_> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::Identifier(i) => write!(f, "{i}")?,
-            Literal::String(s) => write!(f, "{s}")?,
-            Literal::Number(n) => write!(f, "{n}")?,
-            Literal::Boolean(n) => write!(f, "{n}")?,
-            Literal::Null => write!(f, "null")?,
-        }
+#[derive(Debug)]
+pub enum Declaration<'a> {
+    Var {
+        identifier: &'a str,
+        expression: Expr<'a>,
+    },
+    Statement(Stmt<'a>),
+}
 
-        Ok(())
-    }
+#[derive(Debug)]
+pub enum Stmt<'a> {
+    ExprStmt(Expr<'a>),
+    PrintStmt(Expr<'a>),
 }
 
 #[derive(Debug)]
@@ -68,6 +66,29 @@ impl Display for Expr<'_> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq)]
+pub enum Literal<'a> {
+    Identifier(&'a str),
+    String(Cow<'a, str>),
+    Number(f64),
+    Boolean(bool),
+    Null, // eww
+}
+
+impl Display for Literal<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Literal::Identifier(i) => write!(f, "{i}")?,
+            Literal::String(s) => write!(f, "{s}")?,
+            Literal::Number(n) => write!(f, "{n}")?,
+            Literal::Boolean(n) => write!(f, "{n}")?,
+            Literal::Null => write!(f, "null")?,
+        }
+
+        Ok(())
+    }
+}
+
 macro_rules! binary_expr {
     ( $name:ident, $left:ident, $ops:expr, $right:ident ) => {
         fn $name(&'b mut self) -> Expr<'a> {
@@ -104,12 +125,48 @@ where
         }
     }
 
-    pub fn parse(&'b mut self) -> Expr<'a> {
-        self.expression()
+    pub fn parse(&'b mut self) -> Program<'a> {
+        let mut decls = Vec::new();
+        while self.tokens.peek().is_some() {
+            decls.push(self.declaration());
+            self.matches(&[TokenType::Semicolon]).expect("expected ';'");
+        }
+        Program::Declarations(decls)
+    }
+
+    fn declaration(&'b mut self) -> Declaration<'a> {
+        if let Some(t) = self.matches(&[TokenType::Var]) {
+            let Some(name) = self.matches(&[TokenType::Identifier]) else {
+                panic!("expected identifier on line {}", t.line);
+            };
+            // All variables must be initialized
+            self.matches(&[TokenType::Equal])
+                .unwrap_or_else(|| panic!("expected '=' after VAR on line {}", t.line));
+            let initializer = self.expression();
+            Declaration::Var {
+                identifier: name.lexeme,
+                expression: initializer,
+            }
+        } else {
+            Declaration::Statement(self.statement())
+        }
     }
 
     fn expression(&'b mut self) -> Expr<'a> {
         self.equality()
+    }
+
+    fn statement(&'b mut self) -> Stmt<'a> {
+        if self.matches(&[TokenType::Print]).is_some() {
+            return self.print_statement();
+        }
+
+        return Stmt::ExprStmt(self.expression());
+    }
+
+    fn print_statement(&'b mut self) -> Stmt<'a> {
+        let expr = self.expression();
+        Stmt::PrintStmt(expr)
     }
 
     fn matches(&'b mut self, types: &[TokenType]) -> Option<Token<'a>> {

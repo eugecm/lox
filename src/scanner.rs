@@ -45,7 +45,7 @@ impl<'a> Scanner<'a> {
 pub struct Token<'a> {
     pub typ: TokenType,
     pub lexeme: &'a str,
-    line: usize,
+    pub line: usize,
 }
 
 impl<'a> Token<'a> {
