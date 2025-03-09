@@ -3,6 +3,7 @@ use std::path::Path;
 use clap::Parser;
 use eyre::Result;
 
+mod environment;
 mod eval;
 mod interpreter;
 mod scanner;

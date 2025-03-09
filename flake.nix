@@ -45,6 +45,8 @@
           checks = self.checks.${system};
 
           packages = [
+            pkgs.rust-analyzer
+            pkgs.lldb_19
           ];
         };
       });

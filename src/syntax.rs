@@ -1,5 +1,5 @@
 use eyre::Context;
-use std::{borrow::Cow, fmt::Display, iter::Peekable};
+use std::{borrow::Cow, fmt::Display, iter::Peekable, rc::Rc};
 
 use crate::scanner::{Token, TokenType};
 
@@ -22,10 +22,15 @@ pub enum Declaration<'a> {
 pub enum Stmt<'a> {
     ExprStmt(Expr<'a>),
     PrintStmt(Expr<'a>),
+    Block(Vec<Declaration<'a>>),
 }
 
 #[derive(Debug)]
 pub enum Expr<'a> {
+    Assign {
+        name: &'a str,
+        expr: Box<Expr<'a>>,
+    },
     Binary {
         left: Box<Expr<'a>>,
         op: Token<'a>,
@@ -40,6 +45,9 @@ pub enum Expr<'a> {
     Unary {
         op: Token<'a>,
         right: Box<Expr<'a>>,
+    },
+    Var {
+        name: &'a str,
     },
 }
 
@@ -61,6 +69,12 @@ impl Display for Expr<'_> {
                 Display::fmt(op, f)?;
                 Display::fmt(right, f)?;
             }
+            Expr::Var { name } => Display::fmt(name, f)?,
+            Expr::Assign { name, expr } => {
+                Display::fmt(name, f)?;
+                write!(f, "=")?;
+                Display::fmt(&expr, f)?;
+            }
         }
         Ok(())
     }
@@ -69,7 +83,7 @@ impl Display for Expr<'_> {
 #[derive(Debug, Clone, PartialEq)]
 pub enum Literal<'a> {
     Identifier(&'a str),
-    String(Cow<'a, str>),
+    String(Rc<Cow<'a, str>>),
     Number(f64),
     Boolean(bool),
     Null, // eww
@@ -129,7 +143,6 @@ where
         let mut decls = Vec::new();
         while self.tokens.peek().is_some() {
             decls.push(self.declaration());
-            self.matches(&[TokenType::Semicolon]).expect("expected ';'");
         }
         Program::Declarations(decls)
     }
@@ -143,17 +156,38 @@ where
             self.matches(&[TokenType::Equal])
                 .unwrap_or_else(|| panic!("expected '=' after VAR on line {}", t.line));
             let initializer = self.expression();
+            self.matches(&[TokenType::Semicolon]).expect("expected ';'");
             Declaration::Var {
                 identifier: name.lexeme,
                 expression: initializer,
             }
         } else {
-            Declaration::Statement(self.statement())
+            let stmt = self.statement();
+            Declaration::Statement(stmt)
         }
     }
 
     fn expression(&'b mut self) -> Expr<'a> {
-        self.equality()
+        self.assignment()
+    }
+
+    fn assignment(&'b mut self) -> Expr<'a> {
+        let expr = self.equality();
+
+        if let Some(_) = self.matches(&[TokenType::Equal]) {
+            let value = self.assignment();
+
+            if let Expr::Var { name } = expr {
+                return Expr::Assign {
+                    name,
+                    expr: Box::new(value),
+                };
+            }
+
+            panic!("Invalid assignment target");
+        }
+
+        expr
     }
 
     fn statement(&'b mut self) -> Stmt<'a> {
@@ -161,11 +195,35 @@ where
             return self.print_statement();
         }
 
-        return Stmt::ExprStmt(self.expression());
+        if self.matches(&[TokenType::LeftBrace]).is_some() {
+            return self.block();
+        }
+
+        let expr = self.expression();
+        self.matches(&[TokenType::Semicolon]).expect("expected ';'");
+        return Stmt::ExprStmt(expr);
+    }
+
+    fn block(&'b mut self) -> Stmt<'a> {
+        let mut statements = Vec::new();
+        loop {
+            let Some(next) = self.tokens.peek() else {
+                break;
+            };
+            if next.typ == TokenType::RightBrace {
+                break;
+            };
+            statements.push(self.declaration());
+        }
+
+        self.matches(&[TokenType::RightBrace])
+            .unwrap_or_else(|| panic!("expected '}}'"));
+        Stmt::Block(statements)
     }
 
     fn print_statement(&'b mut self) -> Stmt<'a> {
         let expr = self.expression();
+        self.matches(&[TokenType::Semicolon]).expect("expected ';'");
         Stmt::PrintStmt(expr)
     }
 
@@ -227,7 +285,7 @@ where
                 ),
             },
             TokenType::String => Expr::Literal {
-                value: Literal::String(Cow::Borrowed(token.lexeme)),
+                value: Literal::String(Rc::new(Cow::Borrowed(token.lexeme))),
             },
 
             TokenType::LeftParen => {
@@ -244,6 +302,9 @@ where
                     expr: Box::new(expr),
                 }
             }
+            TokenType::Identifier => Expr::Var {
+                name: &token.lexeme,
+            },
             _ => panic!("primary: unexpected token {token:?}"),
         }
     }

@@ -1,16 +1,21 @@
-use std::borrow::Cow;
+use std::{borrow::Cow, rc::Rc};
 
 use crate::{
+    environment::Environment,
     scanner::{Token, TokenType},
     syntax::{Expr, Literal},
 };
 
-pub fn eval<'a>(expr: &'a Expr) -> Literal<'a> {
+// 'a is the lifetime bound to the AST. 'b is the lifetime bound to the source code
+
+pub fn eval<'a, 'b: 'a>(expr: &'a Expr<'b>, env: &'a Environment<'b>) -> Literal<'b> {
     match expr {
-        Expr::Binary { left, op, right } => eval_binary(left, *op, right),
-        Expr::Grouping { expr } => eval(expr),
+        Expr::Binary { left, op, right } => eval_binary(left, *op, right, env),
+        Expr::Grouping { expr } => eval(expr, env),
         Expr::Literal { value } => eval_literal(value),
-        Expr::Unary { op, right } => eval_unary(*op, right),
+        Expr::Unary { op, right } => eval_unary(*op, right, env),
+        Expr::Var { name } => eval_var(name, env),
+        Expr::Assign { name, expr } => eval_assign(name, expr, env),
     }
 }
 
@@ -18,10 +23,10 @@ fn eval_literal<'a>(value: &Literal<'a>) -> Literal<'a> {
     value.clone()
 }
 
-fn eval_unary<'a>(op: Token, right: &Expr) -> Literal<'a> {
+fn eval_unary<'a, 'b: 'a>(op: Token, right: &Expr<'b>, env: &'a Environment<'b>) -> Literal<'b> {
     match op.typ {
         TokenType::Minus => {
-            let sub = eval(right);
+            let sub = eval(right, env);
             match sub {
                 Literal::Number(n) => Literal::Number(-n),
                 _ => panic!("invalid "),
@@ -33,9 +38,14 @@ fn eval_unary<'a>(op: Token, right: &Expr) -> Literal<'a> {
     }
 }
 
-fn eval_binary<'a>(left: &Expr, op: Token, right: &Expr) -> Literal<'a> {
-    let left = eval(left);
-    let right = eval(right);
+fn eval_binary<'a, 'b: 'a>(
+    left: &Expr<'b>,
+    op: Token,
+    right: &Expr<'b>,
+    env: &'a Environment<'b>,
+) -> Literal<'b> {
+    let left = eval(left, env);
+    let right = eval(right, env);
     match (left, op.typ, right) {
         // Numbers
         (Literal::Number(left), TokenType::Minus, Literal::Number(right)) => {
@@ -66,7 +76,7 @@ fn eval_binary<'a>(left: &Expr, op: Token, right: &Expr) -> Literal<'a> {
         (left, TokenType::BangEqual, right) => Literal::Boolean(!is_equal(left, right)),
 
         (Literal::String(left), TokenType::Plus, Literal::String(right)) => {
-            Literal::String(Cow::Owned(format!("{left}{right}")))
+            Literal::String(Rc::new(Cow::Owned(format!("{left}{right}"))))
         }
 
         (left, op, right) => {
@@ -75,6 +85,23 @@ fn eval_binary<'a>(left: &Expr, op: Token, right: &Expr) -> Literal<'a> {
             )
         }
     }
+}
+
+fn eval_var<'a, 'b: 'a>(name: &'b str, env: &'a Environment<'b>) -> Literal<'b> {
+    env.get(name)
+        .unwrap_or_else(|| panic!("undefined variable {name}"))
+        .clone()
+}
+
+fn eval_assign<'a, 'b: 'a>(
+    name: &'b str,
+    expr: &'a Expr<'b>,
+    env: &'a Environment<'b>,
+) -> Literal<'b> {
+    let value = eval(expr, env);
+    env.mutate(name, value)
+        .unwrap_or_else(|| panic!("undefined {name}"))
+        .clone()
 }
 
 fn is_equal(left: Literal, right: Literal) -> bool {
@@ -89,31 +116,45 @@ fn is_equal(left: Literal, right: Literal) -> bool {
 
 #[cfg(test)]
 mod test {
-    use crate::{
-        scanner::Scanner,
-        syntax::{Literal, Parser},
-    };
+    use std::rc::Rc;
 
-    use super::eval;
+    use crate::{
+        environment::Environment,
+        eval,
+        scanner::Scanner,
+        syntax::{Declaration, Literal, Parser, Program, Stmt},
+    };
 
     #[test]
     fn test_expressions() {
         let cases = [
-            ("1+1", Literal::Number(2.)),
-            ("(1+3)*5", Literal::Number(20.)),
-            ("20 == 14", Literal::Boolean(false)),
-            ("20 != 14", Literal::Boolean(true)),
-            (r#""hello" == "hello""#, Literal::Boolean(true)),
-            (r#""hello" == "hi""#, Literal::Boolean(false)),
-            (r#""foo" + "bar""#, Literal::String("foobar".into())),
+            ("1+1;", Literal::Number(2.)),
+            ("(1+3)*5;", Literal::Number(20.)),
+            ("20 == 14;", Literal::Boolean(false)),
+            ("20 != 14;", Literal::Boolean(true)),
+            (r#""hello" == "hello";"#, Literal::Boolean(true)),
+            (r#""hello" == "hi";"#, Literal::Boolean(false)),
+            (
+                r#""foo" + "bar";"#,
+                Literal::String(Rc::new("foobar".into())),
+            ),
         ];
 
         for (expr_str, expected) in cases {
             let scanner = Scanner::new(&expr_str);
             let mut parser = Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
             let ast = parser.parse();
-            let result = eval(&ast);
-            assert_eq!(expected, result);
+            let Program::Declarations(decls) = ast;
+            let env = Environment::default();
+            for decl in decls {
+                match decl {
+                    Declaration::Statement(Stmt::ExprStmt(expr)) => {
+                        let result = eval::eval(&expr, &env);
+                        assert_eq!(expected, result);
+                    }
+                    _ => panic!("test can only include expressions"),
+                }
+            }
         }
     }
 }
