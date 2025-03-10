@@ -16,7 +16,29 @@ pub fn eval<'a, 'b: 'a>(expr: &'a Expr<'b>, env: &'a Environment<'b>) -> Literal
         Expr::Unary { op, right } => eval_unary(*op, right, env),
         Expr::Var { name } => eval_var(name, env),
         Expr::Assign { name, expr } => eval_assign(name, expr, env),
+        Expr::Logical { left, op, right } => eval_logical(left, *op, right, env),
     }
+}
+
+fn eval_logical<'a, 'b: 'a>(
+    left: &Expr<'b>,
+    op: Token,
+    right: &Expr<'b>,
+    env: &'a Environment<'b>,
+) -> Literal<'b> {
+    let left = eval(left, env);
+
+    if op.typ == TokenType::Or {
+        if left.is_truthy() {
+            return left;
+        }
+    } else {
+        if !left.is_truthy() {
+            return left;
+        }
+    }
+
+    eval(right, env)
 }
 
 fn eval_literal<'a>(value: &Literal<'a>) -> Literal<'a> {

@@ -21,7 +21,16 @@ pub enum Declaration<'a> {
 #[derive(Debug)]
 pub enum Stmt<'a> {
     ExprStmt(Expr<'a>),
+    IfStmt {
+        condition: Expr<'a>,
+        then_branch: Box<Stmt<'a>>,
+        else_branch: Option<Box<Stmt<'a>>>,
+    },
     PrintStmt(Expr<'a>),
+    WhileStmt {
+        condition: Expr<'a>,
+        body: Box<Stmt<'a>>,
+    },
     Block(Vec<Declaration<'a>>),
 }
 
@@ -41,6 +50,11 @@ pub enum Expr<'a> {
     },
     Literal {
         value: Literal<'a>,
+    },
+    Logical {
+        left: Box<Expr<'a>>,
+        op: Token<'a>,
+        right: Box<Expr<'a>>,
     },
     Unary {
         op: Token<'a>,
@@ -75,6 +89,11 @@ impl Display for Expr<'_> {
                 write!(f, "=")?;
                 Display::fmt(&expr, f)?;
             }
+            Expr::Logical { left, op, right } => {
+                Display::fmt(&left, f)?;
+                Display::fmt(&op, f)?;
+                Display::fmt(&right, f)?;
+            }
         }
         Ok(())
     }
@@ -87,6 +106,15 @@ pub enum Literal<'a> {
     Number(f64),
     Boolean(bool),
     Null, // eww
+}
+
+impl<'a> Literal<'a> {
+    pub fn is_truthy(&self) -> bool {
+        match self {
+            Literal::Boolean(value) => *value,
+            typ => panic!("invalid non-boolean value {typ:?} evaluated to truthy"),
+        }
+    }
 }
 
 impl Display for Literal<'_> {
@@ -172,7 +200,7 @@ where
     }
 
     fn assignment(&'b mut self) -> Expr<'a> {
-        let expr = self.equality();
+        let expr = self.or();
 
         if let Some(_) = self.matches(&[TokenType::Equal]) {
             let value = self.assignment();
@@ -190,9 +218,49 @@ where
         expr
     }
 
+    fn or(&'b mut self) -> Expr<'a> {
+        let mut expr = self.and();
+
+        while let Some(t) = self.matches(&[TokenType::Or]) {
+            let op = t;
+            let right = self.and();
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+            }
+        }
+
+        expr
+    }
+
+    fn and(&'b mut self) -> Expr<'a> {
+        let mut expr = self.equality();
+
+        while let Some(t) = self.matches(&[TokenType::And]) {
+            let op = t;
+            let right = self.equality();
+            expr = Expr::Logical {
+                left: Box::new(expr),
+                op,
+                right: Box::new(right),
+            }
+        }
+
+        expr
+    }
+
     fn statement(&'b mut self) -> Stmt<'a> {
+        if self.matches(&[TokenType::If]).is_some() {
+            return self.if_statement();
+        }
+
         if self.matches(&[TokenType::Print]).is_some() {
             return self.print_statement();
+        }
+
+        if self.matches(&[TokenType::While]).is_some() {
+            return self.while_statement();
         }
 
         if self.matches(&[TokenType::LeftBrace]).is_some() {
@@ -202,6 +270,20 @@ where
         let expr = self.expression();
         self.matches(&[TokenType::Semicolon]).expect("expected ';'");
         return Stmt::ExprStmt(expr);
+    }
+
+    fn while_statement(&'b mut self) -> Stmt<'a> {
+        self.matches(&[TokenType::LeftParen])
+            .expect("expected '(' after 'while'");
+        let condition = self.expression();
+        self.matches(&[TokenType::RightParen])
+            .expect("expected ')' after while condition");
+        let body = self.statement();
+
+        Stmt::WhileStmt {
+            condition,
+            body: Box::new(body),
+        }
     }
 
     fn block(&'b mut self) -> Stmt<'a> {
@@ -219,6 +301,25 @@ where
         self.matches(&[TokenType::RightBrace])
             .unwrap_or_else(|| panic!("expected '}}'"));
         Stmt::Block(statements)
+    }
+
+    fn if_statement(&'b mut self) -> Stmt<'a> {
+        self.matches(&[TokenType::LeftParen])
+            .expect("expected '(' after 'if'");
+        let condition = self.expression();
+        self.matches(&[TokenType::RightParen])
+            .expect("expected ')' after if condition");
+
+        let then_branch = Box::new(self.statement());
+        let else_branch = self
+            .matches(&[TokenType::Else])
+            .map(|_| Box::new(self.statement()));
+
+        Stmt::IfStmt {
+            condition,
+            then_branch,
+            else_branch,
+        }
     }
 
     fn print_statement(&'b mut self) -> Stmt<'a> {
