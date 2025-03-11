@@ -55,7 +55,7 @@ impl<'sc: 's, 's> Interpreter<'sc> {
                     literal => panic!("while condition can only be boolean, got '{literal:?}'"),
                 };
                 if condition_value {
-                    self.execute(Declaration::Statement(*body));
+                    self.execute(Declaration::Statement(*body.clone()));
                 } else {
                     break;
                 }

@@ -9,7 +9,7 @@ pub enum Program<'a> {
     Declarations(Vec<Declaration<'a>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Declaration<'a> {
     Var {
         identifier: &'a str,
@@ -18,7 +18,7 @@ pub enum Declaration<'a> {
     Statement(Stmt<'a>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Stmt<'a> {
     ExprStmt(Expr<'a>),
     IfStmt {
@@ -34,7 +34,7 @@ pub enum Stmt<'a> {
     Block(Vec<Declaration<'a>>),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub enum Expr<'a> {
     Assign {
         name: &'a str,
@@ -259,6 +259,10 @@ where
             return self.print_statement();
         }
 
+        if self.matches(&[TokenType::For]).is_some() {
+            return self.for_statement();
+        }
+
         if self.matches(&[TokenType::While]).is_some() {
             return self.while_statement();
         }
@@ -270,6 +274,70 @@ where
         let expr = self.expression();
         self.matches(&[TokenType::Semicolon]).expect("expected ';'");
         return Stmt::ExprStmt(expr);
+    }
+
+    fn for_statement(&'b mut self) -> Stmt<'a> {
+        self.matches(&[TokenType::LeftParen])
+            .expect("expected '(' after 'for'");
+
+        let initializer = if let Some(_) = self.matches(&[TokenType::Semicolon]) {
+            None
+        } else if self.peek_matches(&[TokenType::Var]) {
+            Some(self.declaration())
+        } else {
+            Some(Declaration::Statement(Stmt::ExprStmt(self.expression())))
+        };
+
+        let condition = if let Some(token) = self.tokens.peek() {
+            if token.typ != TokenType::Semicolon {
+                Some(self.expression())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+
+        self.matches(&[TokenType::Semicolon])
+            .expect("expected ';' after loop condition");
+
+        let increment = if let Some(token) = self.tokens.peek() {
+            if token.typ != TokenType::RightParen {
+                Some(self.expression())
+            } else {
+                None
+            }
+        } else {
+            None
+        };
+        self.matches(&[TokenType::RightParen])
+            .expect("expected ')' after for clauses");
+
+        let mut body = self.statement();
+
+        body = if let Some(increment) = increment {
+            Stmt::Block(vec![
+                Declaration::Statement(body),
+                Declaration::Statement(Stmt::ExprStmt(increment)),
+            ])
+        } else {
+            body
+        };
+
+        let condition = condition.unwrap_or(Expr::Literal {
+            value: Literal::Boolean(true),
+        });
+
+        body = Stmt::WhileStmt {
+            condition,
+            body: Box::new(body),
+        };
+
+        if let Some(initializer) = initializer {
+            body = Stmt::Block(vec![initializer, Declaration::Statement(body)]);
+        }
+
+        body
     }
 
     fn while_statement(&'b mut self) -> Stmt<'a> {
@@ -330,6 +398,13 @@ where
 
     fn matches(&'b mut self, types: &[TokenType]) -> Option<Token<'a>> {
         self.tokens.next_if(|t| types.contains(&t.typ))
+    }
+
+    fn peek_matches(&'b mut self, types: &[TokenType]) -> bool {
+        self.tokens
+            .peek()
+            .map(|t| types.contains(&t.typ))
+            .unwrap_or_default()
     }
 
     binary_expr!(
