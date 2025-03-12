@@ -8,7 +8,7 @@ use crate::{
 
 // 'a is the lifetime bound to the AST. 'b is the lifetime bound to the source code
 
-pub fn eval<'a, 'b: 'a>(expr: &'a Expr<'b>, env: &'a Environment<'b>) -> Literal<'b> {
+pub fn eval<'a, 'b: 'a>(expr: &'a Expr<'b>, env: &'a mut Environment<'b>) -> Literal<'b> {
     match expr {
         Expr::Binary { left, op, right } => eval_binary(left, *op, right, env),
         Expr::Grouping { expr } => eval(expr, env),
@@ -24,7 +24,7 @@ fn eval_logical<'a, 'b: 'a>(
     left: &Expr<'b>,
     op: Token,
     right: &Expr<'b>,
-    env: &'a Environment<'b>,
+    env: &'a mut Environment<'b>,
 ) -> Literal<'b> {
     let left = eval(left, env);
 
@@ -45,7 +45,11 @@ fn eval_literal<'a>(value: &Literal<'a>) -> Literal<'a> {
     value.clone()
 }
 
-fn eval_unary<'a, 'b: 'a>(op: Token, right: &Expr<'b>, env: &'a Environment<'b>) -> Literal<'b> {
+fn eval_unary<'a, 'b: 'a>(
+    op: Token,
+    right: &Expr<'b>,
+    env: &'a mut Environment<'b>,
+) -> Literal<'b> {
     match op.typ {
         TokenType::Minus => {
             let sub = eval(right, env);
@@ -64,7 +68,7 @@ fn eval_binary<'a, 'b: 'a>(
     left: &Expr<'b>,
     op: Token,
     right: &Expr<'b>,
-    env: &'a Environment<'b>,
+    env: &'a mut Environment<'b>,
 ) -> Literal<'b> {
     let left = eval(left, env);
     let right = eval(right, env);
@@ -118,7 +122,7 @@ fn eval_var<'a, 'b: 'a>(name: &'b str, env: &'a Environment<'b>) -> Literal<'b> 
 fn eval_assign<'a, 'b: 'a>(
     name: &'b str,
     expr: &'a Expr<'b>,
-    env: &'a Environment<'b>,
+    env: &'a mut Environment<'b>,
 ) -> Literal<'b> {
     let value = eval(expr, env);
     env.mutate(name, value)
@@ -167,11 +171,11 @@ mod test {
             let mut parser = Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
             let ast = parser.parse();
             let Program::Declarations(decls) = ast;
-            let env = Environment::default();
+            let mut env = Environment::default();
             for decl in decls {
                 match decl {
                     Declaration::Statement(Stmt::ExprStmt(expr)) => {
-                        let result = eval::eval(&expr, &env);
+                        let result = eval::eval(&expr, &mut env);
                         assert_eq!(expected, result);
                     }
                     _ => panic!("test can only include expressions"),

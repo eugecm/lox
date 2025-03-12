@@ -1,5 +1,3 @@
-use std::rc::Rc;
-
 use crate::{
     environment::Environment,
     eval::eval,
@@ -8,13 +6,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Interpreter<'a> {
-    environment: Rc<Environment<'a>>,
+    environment: Environment<'a>,
 }
 
 impl<'sc: 's, 's> Interpreter<'sc> {
     pub fn new() -> Self {
         Self {
-            environment: Rc::new(Environment::default()),
+            environment: Environment::default(),
         }
     }
 
@@ -65,7 +63,7 @@ impl<'sc: 's, 's> Interpreter<'sc> {
                 println!("{value}")
             }
             Declaration::Statement(Stmt::Block(decls)) => {
-                self.execute_block(decls, Rc::new(Environment::new(self.environment.clone())));
+                self.execute_block(decls);
             }
             Declaration::Var {
                 identifier,
@@ -77,14 +75,13 @@ impl<'sc: 's, 's> Interpreter<'sc> {
         }
     }
 
-    fn execute_block(&'s mut self, statements: Vec<Declaration<'sc>>, env: Rc<Environment<'sc>>) {
-        let previous = self.environment.clone();
-        self.environment = env;
+    fn execute_block(&'s mut self, statements: Vec<Declaration<'sc>>) {
+        self.environment.push_env();
 
         for stmt in statements {
             self.execute(stmt);
         }
 
-        self.environment = previous;
+        self.environment.pop_env();
     }
 }
