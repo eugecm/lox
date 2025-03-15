@@ -1,13 +1,13 @@
 use std::collections::HashMap;
 
-use crate::syntax::Literal;
+use crate::syntax::{Identifier, Literal};
 
 #[derive(Debug)]
-pub struct Environment<'a> {
-    stack: Vec<HashMap<&'a str, Literal<'a>>>,
+pub struct Environment {
+    stack: Vec<HashMap<Identifier, Literal>>,
 }
 
-impl<'a> Default for Environment<'a> {
+impl<'a> Default for Environment {
     fn default() -> Self {
         Self {
             stack: vec![HashMap::default()],
@@ -15,12 +15,12 @@ impl<'a> Default for Environment<'a> {
     }
 }
 
-impl<'a, 's> Environment<'a> {
-    pub fn push_env(&'s mut self) {
+impl Environment {
+    pub fn push_env(&mut self) {
         self.stack.push(HashMap::default());
     }
 
-    pub fn pop_env(&'s mut self) {
+    pub fn pop_env(&mut self) {
         self.stack.pop();
         assert!(
             self.stack.len() > 0,
@@ -28,25 +28,30 @@ impl<'a, 's> Environment<'a> {
         )
     }
 
-    pub fn define(&mut self, name: &'a str, value: Literal<'a>) {
+    pub fn define(&mut self, name: Identifier, value: Literal) {
         self.stack
             .last_mut()
             .expect("must have at least 1 environment")
             .insert(name, value);
     }
 
-    pub fn get(&self, name: &'a str) -> Option<Literal<'a>> {
+    pub fn get(&self, name: &Identifier) -> Option<Literal> {
         self.stack.iter().rev().find_map(|h| h.get(name).cloned())
     }
 
-    pub fn mutate(&mut self, name: &'a str, value: Literal<'a>) -> Option<Literal<'a>> {
-        self.stack
-            .iter_mut()
-            .rev()
-            .find_map(|h| match h.entry(name) {
-                std::collections::hash_map::Entry::Occupied(entry) => Some(entry),
-                std::collections::hash_map::Entry::Vacant(_) => None,
-            })
-            .map(|mut entry| entry.insert(value))
+    pub fn mutate(&mut self, name: &Identifier, value: Literal) -> Option<Literal> {
+        let mut name = name.clone();
+        for env in self.stack.iter_mut().rev() {
+            match env.entry(name) {
+                std::collections::hash_map::Entry::Occupied(mut entry) => {
+                    return Some(entry.insert(value))
+                }
+                std::collections::hash_map::Entry::Vacant(entry) => {
+                    // Return ownership of key back to name
+                    name = entry.into_key();
+                }
+            }
+        }
+        None
     }
 }

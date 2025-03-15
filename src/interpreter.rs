@@ -1,22 +1,22 @@
 use crate::{
     environment::Environment,
     eval::eval,
-    syntax::{Declaration, Program, Stmt},
+    syntax::{Declaration, Identifier, Program, Stmt},
 };
 
 #[derive(Debug)]
-pub struct Interpreter<'a> {
-    environment: Environment<'a>,
+pub struct Interpreter {
+    environment: Environment,
 }
 
-impl<'sc: 's, 's> Interpreter<'sc> {
+impl Interpreter {
     pub fn new() -> Self {
         Self {
             environment: Environment::default(),
         }
     }
 
-    pub fn interpret(&'s mut self, prog: Program<'sc>) {
+    pub fn interpret(&mut self, prog: Program) {
         match prog {
             Program::Declarations(decls) => {
                 for decl in decls {
@@ -26,7 +26,7 @@ impl<'sc: 's, 's> Interpreter<'sc> {
         }
     }
 
-    pub fn execute(&'s mut self, decl: Declaration<'sc>) {
+    pub fn execute(&mut self, decl: Declaration) {
         match decl {
             Declaration::Statement(Stmt::ExprStmt(expr)) => {
                 let _ = eval(&expr, &mut self.environment);
@@ -70,12 +70,12 @@ impl<'sc: 's, 's> Interpreter<'sc> {
                 expression,
             } => {
                 let value = eval(&expression, &mut self.environment);
-                self.environment.define(identifier, value);
+                self.environment.define(Identifier(identifier), value);
             }
         }
     }
 
-    fn execute_block(&'s mut self, statements: Vec<Declaration<'sc>>) {
+    fn execute_block(&mut self, statements: Vec<Declaration>) {
         self.environment.push_env();
 
         for stmt in statements {

@@ -1,8 +1,4 @@
-use std::{
-    fmt::{Display, Write},
-    iter::Peekable,
-    str::Chars,
-};
+use std::{fmt::Display, iter::Peekable, rc::Rc, str::Chars};
 
 use thiserror::Error;
 
@@ -41,22 +37,27 @@ impl<'a> Scanner<'a> {
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-pub struct Token<'a> {
+#[derive(Debug, Clone)]
+pub struct Token {
     pub typ: TokenType,
-    pub lexeme: &'a str,
+    pub lexeme: Rc<str>,
     pub line: usize,
 }
 
-impl<'a> Token<'a> {
-    pub fn new(typ: TokenType, lexeme: &'a str, line: usize) -> Self {
-        Self { typ, lexeme, line }
+impl Token {
+    #[allow(dead_code)]
+    pub fn new(typ: TokenType, lexeme: &str, line: usize) -> Self {
+        Self {
+            typ,
+            lexeme: lexeme.to_owned().into(),
+            line,
+        }
     }
 }
 
-impl Display for Token<'_> {
+impl Display for Token {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.write_str(self.lexeme)
+        f.write_str(&self.lexeme)
     }
 }
 
@@ -70,10 +71,6 @@ pub struct Tokens<'a> {
 }
 
 impl<'a> Tokens<'a> {
-    fn is_at_end(&mut self) -> bool {
-        self.chars.peek().is_none()
-    }
-
     fn advance(&mut self) -> Option<char> {
         self.chars.next().inspect(|c| self.cursor += c.len_utf8())
     }
@@ -98,12 +95,12 @@ impl<'a> Tokens<'a> {
 }
 
 impl<'a> Iterator for Tokens<'a> {
-    type Item = Result<Token<'a>, ParserError>;
+    type Item = Result<Token, ParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
         // scanToken in the book
         let mut literal_start = self.cursor;
-        let (lexeme, token_type) = loop {
+        let (_, token_type) = loop {
             let lexeme = self.advance()?;
             let token_type = match lexeme {
                 // Simple cases
@@ -231,9 +228,9 @@ impl<'a> Iterator for Tokens<'a> {
         Some(Ok(Token {
             typ: token_type,
             lexeme: if token_type == TokenType::String {
-                &self.contents[literal_start + 1..self.cursor - 1]
+                self.contents[literal_start + 1..self.cursor - 1].into()
             } else {
-                &self.contents[literal_start..self.cursor]
+                self.contents[literal_start..self.cursor].into()
             },
             line: self.line,
         }))
@@ -311,5 +308,6 @@ pub enum TokenType {
     Var,
     While,
 
+    #[allow(dead_code)]
     Eof,
 }

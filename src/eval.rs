@@ -1,31 +1,24 @@
-use std::{borrow::Cow, rc::Rc};
-
 use crate::{
     environment::Environment,
     scanner::{Token, TokenType},
-    syntax::{Expr, Literal},
+    syntax::{Expr, Identifier, Literal},
 };
 
 // 'a is the lifetime bound to the AST. 'b is the lifetime bound to the source code
 
-pub fn eval<'a, 'b: 'a>(expr: &'a Expr<'b>, env: &'a mut Environment<'b>) -> Literal<'b> {
+pub fn eval(expr: &Expr, env: &mut Environment) -> Literal {
     match expr {
-        Expr::Binary { left, op, right } => eval_binary(left, *op, right, env),
+        Expr::Binary { left, op, right } => eval_binary(left, op, right, env),
         Expr::Grouping { expr } => eval(expr, env),
         Expr::Literal { value } => eval_literal(value),
-        Expr::Unary { op, right } => eval_unary(*op, right, env),
+        Expr::Unary { op, right } => eval_unary(op, right, env),
         Expr::Var { name } => eval_var(name, env),
         Expr::Assign { name, expr } => eval_assign(name, expr, env),
-        Expr::Logical { left, op, right } => eval_logical(left, *op, right, env),
+        Expr::Logical { left, op, right } => eval_logical(left, op, right, env),
     }
 }
 
-fn eval_logical<'a, 'b: 'a>(
-    left: &Expr<'b>,
-    op: Token,
-    right: &Expr<'b>,
-    env: &'a mut Environment<'b>,
-) -> Literal<'b> {
+fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Literal {
     let left = eval(left, env);
 
     if op.typ == TokenType::Or {
@@ -41,15 +34,11 @@ fn eval_logical<'a, 'b: 'a>(
     eval(right, env)
 }
 
-fn eval_literal<'a>(value: &Literal<'a>) -> Literal<'a> {
+fn eval_literal(value: &Literal) -> Literal {
     value.clone()
 }
 
-fn eval_unary<'a, 'b: 'a>(
-    op: Token,
-    right: &Expr<'b>,
-    env: &'a mut Environment<'b>,
-) -> Literal<'b> {
+fn eval_unary(op: &Token, right: &Expr, env: &mut Environment) -> Literal {
     match op.typ {
         TokenType::Minus => {
             let sub = eval(right, env);
@@ -64,12 +53,7 @@ fn eval_unary<'a, 'b: 'a>(
     }
 }
 
-fn eval_binary<'a, 'b: 'a>(
-    left: &Expr<'b>,
-    op: Token,
-    right: &Expr<'b>,
-    env: &'a mut Environment<'b>,
-) -> Literal<'b> {
+fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Literal {
     let left = eval(left, env);
     let right = eval(right, env);
     match (left, op.typ, right) {
@@ -102,7 +86,7 @@ fn eval_binary<'a, 'b: 'a>(
         (left, TokenType::BangEqual, right) => Literal::Boolean(!is_equal(left, right)),
 
         (Literal::String(left), TokenType::Plus, Literal::String(right)) => {
-            Literal::String(Rc::new(Cow::Owned(format!("{left}{right}"))))
+            Literal::String(format!("{left}{right}").into())
         }
 
         (left, op, right) => {
@@ -113,17 +97,13 @@ fn eval_binary<'a, 'b: 'a>(
     }
 }
 
-fn eval_var<'a, 'b: 'a>(name: &'b str, env: &'a Environment<'b>) -> Literal<'b> {
+fn eval_var(name: &Identifier, env: &Environment) -> Literal {
     env.get(name)
         .unwrap_or_else(|| panic!("undefined variable {name}"))
         .clone()
 }
 
-fn eval_assign<'a, 'b: 'a>(
-    name: &'b str,
-    expr: &'a Expr<'b>,
-    env: &'a mut Environment<'b>,
-) -> Literal<'b> {
+fn eval_assign(name: &Identifier, expr: &Expr, env: &mut Environment) -> Literal {
     let value = eval(expr, env);
     env.mutate(name, value)
         .unwrap_or_else(|| panic!("undefined {name}"))
@@ -142,8 +122,6 @@ fn is_equal(left: Literal, right: Literal) -> bool {
 
 #[cfg(test)]
 mod test {
-    use std::rc::Rc;
-
     use crate::{
         environment::Environment,
         eval,
@@ -160,10 +138,7 @@ mod test {
             ("20 != 14;", Literal::Boolean(true)),
             (r#""hello" == "hello";"#, Literal::Boolean(true)),
             (r#""hello" == "hi";"#, Literal::Boolean(false)),
-            (
-                r#""foo" + "bar";"#,
-                Literal::String(Rc::new("foobar".into())),
-            ),
+            (r#""foo" + "bar";"#, Literal::String("foobar".into())),
         ];
 
         for (expr_str, expected) in cases {
