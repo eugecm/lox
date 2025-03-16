@@ -20,14 +20,14 @@ pub enum Declaration {
 
 #[derive(Debug, Clone)]
 pub enum Stmt {
-    ExprStmt(Expr),
-    IfStmt {
+    Expr(Expr),
+    If {
         condition: Expr,
         then_branch: Box<Stmt>,
         else_branch: Option<Box<Stmt>>,
     },
-    PrintStmt(Expr),
-    WhileStmt {
+    Print(Expr),
+    While {
         condition: Expr,
         body: Box<Stmt>,
     },
@@ -283,7 +283,7 @@ where
 
         let expr = self.expression();
         self.matches(&[TokenType::Semicolon]).expect("expected ';'");
-        Stmt::ExprStmt(expr)
+        Stmt::Expr(expr)
     }
 
     fn for_statement(&mut self) -> Stmt {
@@ -295,7 +295,7 @@ where
         } else if self.peek_matches(&[TokenType::Var]) {
             Some(self.declaration())
         } else {
-            Some(Declaration::Statement(Stmt::ExprStmt(self.expression())))
+            Some(Declaration::Statement(Stmt::Expr(self.expression())))
         };
 
         let condition = if let Some(token) = self.tokens.peek() {
@@ -328,7 +328,7 @@ where
         body = if let Some(increment) = increment {
             Stmt::Block(vec![
                 Declaration::Statement(body),
-                Declaration::Statement(Stmt::ExprStmt(increment)),
+                Declaration::Statement(Stmt::Expr(increment)),
             ])
         } else {
             body
@@ -338,7 +338,7 @@ where
             value: Literal::Boolean(true),
         });
 
-        body = Stmt::WhileStmt {
+        body = Stmt::While {
             condition,
             body: Box::new(body),
         };
@@ -358,7 +358,7 @@ where
             .expect("expected ')' after while condition");
         let body = self.statement();
 
-        Stmt::WhileStmt {
+        Stmt::While {
             condition,
             body: Box::new(body),
         }
@@ -393,7 +393,7 @@ where
             .matches(&[TokenType::Else])
             .map(|_| Box::new(self.statement()));
 
-        Stmt::IfStmt {
+        Stmt::If {
             condition,
             then_branch,
             else_branch,
@@ -403,7 +403,7 @@ where
     fn print_statement(&mut self) -> Stmt {
         let expr = self.expression();
         self.matches(&[TokenType::Semicolon]).expect("expected ';'");
-        Stmt::PrintStmt(expr)
+        Stmt::Print(expr)
     }
 
     fn matches(&mut self, types: &[TokenType]) -> Option<Token> {

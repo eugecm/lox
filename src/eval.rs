@@ -147,7 +147,7 @@ mod test {
             let mut env = Environment::default();
             for decl in decls {
                 match decl {
-                    Declaration::Statement(Stmt::ExprStmt(expr)) => {
+                    Declaration::Statement(Stmt::Expr(expr)) => {
                         let result = eval::eval(&expr, &mut env);
                         assert_eq!(expected, result);
                     }

@@ -28,10 +28,10 @@ impl Interpreter {
 
     fn execute_stmt(&mut self, stmt: &Stmt) {
         match stmt {
-            Stmt::ExprStmt(expr) => {
+            Stmt::Expr(expr) => {
                 let _ = eval(expr, &mut self.environment);
             }
-            Stmt::IfStmt {
+            Stmt::If {
                 condition,
                 then_branch,
                 else_branch,
@@ -42,14 +42,15 @@ impl Interpreter {
                 };
                 if condition_value {
                     self.execute_stmt(then_branch);
-                } else if let Some(else_branch) = else_branch
-                .as_ref() { self.execute_stmt(else_branch) }
+                } else if let Some(else_branch) = else_branch.as_ref() {
+                    self.execute_stmt(else_branch)
+                }
             }
-            Stmt::PrintStmt(expr) => {
+            Stmt::Print(expr) => {
                 let value = eval(expr, &mut self.environment);
                 println!("{value}")
             }
-            Stmt::WhileStmt { condition, body } => loop {
+            Stmt::While { condition, body } => loop {
                 let condition_value = match eval(condition, &mut self.environment) {
                     crate::syntax::Literal::Boolean(value) => value,
                     literal => panic!("while condition can only be boolean, got '{literal:?}'"),

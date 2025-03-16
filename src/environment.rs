@@ -7,7 +7,7 @@ pub struct Environment {
     stack: Vec<HashMap<Identifier, Literal>>,
 }
 
-impl<'a> Default for Environment {
+impl Default for Environment {
     fn default() -> Self {
         Self {
             stack: vec![HashMap::default()],
