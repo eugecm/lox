@@ -18,7 +18,7 @@ pub fn eval(expr: &Expr, env: &mut Environment) -> Object {
         Expr::Logical { left, op, right } => eval_logical(left, op, right, env),
         Expr::Call {
             callee,
-            parens,
+            parens: _,
             args,
         } => eval_call(callee, args, env),
     }
@@ -32,6 +32,12 @@ fn eval_call(callee: &Expr, args: &[Expr], env: &mut Environment) -> Object {
     let Object::Callable(function) = callee else {
         panic!("'{callee}' is not callable!")
     };
+
+    if function.arity() != arguments.len() {
+        let arity = function.arity();
+        let n_args = arguments.len();
+        panic!("called fn/{arity} with {n_args}");
+    }
     function.call(&arguments)
 }
 
