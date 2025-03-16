@@ -25,10 +25,8 @@ fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) ->
         if left.is_truthy() {
             return left;
         }
-    } else {
-        if !left.is_truthy() {
-            return left;
-        }
+    } else if !left.is_truthy() {
+        return left;
     }
 
     eval(right, env)
@@ -142,7 +140,7 @@ mod test {
         ];
 
         for (expr_str, expected) in cases {
-            let scanner = Scanner::new(&expr_str);
+            let scanner = Scanner::new(expr_str);
             let mut parser = Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
             let ast = parser.parse();
             let Program::Declarations(decls) = ast;

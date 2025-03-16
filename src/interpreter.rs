@@ -29,31 +29,28 @@ impl Interpreter {
     fn execute_stmt(&mut self, stmt: &Stmt) {
         match stmt {
             Stmt::ExprStmt(expr) => {
-                let _ = eval(&expr, &mut self.environment);
+                let _ = eval(expr, &mut self.environment);
             }
             Stmt::IfStmt {
                 condition,
                 then_branch,
                 else_branch,
             } => {
-                let condition_value = match eval(&condition, &mut self.environment) {
+                let condition_value = match eval(condition, &mut self.environment) {
                     crate::syntax::Literal::Boolean(value) => value,
                     literal => panic!("if condition can only be boolean, got '{literal:?}'"),
                 };
                 if condition_value {
                     self.execute_stmt(then_branch);
-                } else {
-                    else_branch
-                        .as_ref()
-                        .map(|else_branch| self.execute_stmt(else_branch));
-                }
+                } else if let Some(else_branch) = else_branch
+                .as_ref() { self.execute_stmt(else_branch) }
             }
             Stmt::PrintStmt(expr) => {
-                let value = eval(&expr, &mut self.environment);
+                let value = eval(expr, &mut self.environment);
                 println!("{value}")
             }
             Stmt::WhileStmt { condition, body } => loop {
-                let condition_value = match eval(&condition, &mut self.environment) {
+                let condition_value = match eval(condition, &mut self.environment) {
                     crate::syntax::Literal::Boolean(value) => value,
                     literal => panic!("while condition can only be boolean, got '{literal:?}'"),
                 };
@@ -78,7 +75,7 @@ impl Interpreter {
                 identifier,
                 expression,
             } => {
-                let value = eval(&expression, &mut self.environment);
+                let value = eval(expression, &mut self.environment);
                 self.environment
                     .define(Identifier(identifier.clone()), value);
             }

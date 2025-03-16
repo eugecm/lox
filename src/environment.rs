@@ -23,7 +23,7 @@ impl Environment {
     pub fn pop_env(&mut self) {
         self.stack.pop();
         assert!(
-            self.stack.len() > 0,
+            !self.stack.is_empty(),
             "last environment was popped, but that's impossible"
         )
     }

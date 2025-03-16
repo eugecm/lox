@@ -70,7 +70,7 @@ pub struct Tokens<'a> {
     line: usize,
 }
 
-impl<'a> Tokens<'a> {
+impl Tokens<'_> {
     fn advance(&mut self) -> Option<char> {
         self.chars.next().inspect(|c| self.cursor += c.len_utf8())
     }
@@ -81,7 +81,7 @@ impl<'a> Tokens<'a> {
             return true;
         }
 
-        return false;
+        false
     }
 
     fn next_if<F>(&mut self, f: F) -> Option<char>
@@ -94,7 +94,7 @@ impl<'a> Tokens<'a> {
     }
 }
 
-impl<'a> Iterator for Tokens<'a> {
+impl Iterator for Tokens<'_> {
     type Item = Result<Token, ParserError>;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -184,16 +184,16 @@ impl<'a> Iterator for Tokens<'a> {
 
                 // Unexpected
                 c => {
-                    if c.is_digit(10) {
+                    if c.is_ascii_digit() {
                         // Parse number
-                        while self.next_if(|c| c.is_digit(10)).is_some() {}
+                        while self.next_if(|c| c.is_ascii_digit()).is_some() {}
                         if let Some('.') = self.chars.peek() {
                             // Check if the char afterwards is some digit
                             let after_dot = self.contents[self.cursor + 1..].chars().next();
                             if let Some(p) = after_dot {
-                                if p.is_digit(10) {
+                                if p.is_ascii_digit() {
                                     self.advance(); // consume the dot
-                                    while self.next_if(|c| c.is_digit(10)).is_some() {}
+                                    while self.next_if(|c| c.is_ascii_digit()).is_some() {}
                                 }
                             }
                         }

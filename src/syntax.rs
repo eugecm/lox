@@ -212,7 +212,7 @@ where
     fn assignment(&mut self) -> Expr {
         let expr = self.or();
 
-        if let Some(_) = self.matches(&[TokenType::Equal]) {
+        if self.matches(&[TokenType::Equal]).is_some() {
             let value = self.assignment();
 
             if let Expr::Var { name } = expr {
@@ -283,14 +283,14 @@ where
 
         let expr = self.expression();
         self.matches(&[TokenType::Semicolon]).expect("expected ';'");
-        return Stmt::ExprStmt(expr);
+        Stmt::ExprStmt(expr)
     }
 
     fn for_statement(&mut self) -> Stmt {
         self.matches(&[TokenType::LeftParen])
             .expect("expected '(' after 'for'");
 
-        let initializer = if let Some(_) = self.matches(&[TokenType::Semicolon]) {
+        let initializer = if self.matches(&[TokenType::Semicolon]).is_some() {
             None
         } else if self.peek_matches(&[TokenType::Var]) {
             Some(self.declaration())
