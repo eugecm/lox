@@ -65,6 +65,7 @@ pub enum Expr {
     },
     Call {
         callee: Box<Expr>,
+        #[allow(dead_code)]
         parens: Token,
         args: Vec<Expr>,
     },

@@ -1,4 +1,5 @@
 use crate::{
+    builtins::get_builtins,
     environment::Environment,
     eval::eval,
     syntax::{Declaration, Program, Stmt},
@@ -12,9 +13,13 @@ pub struct Interpreter {
 
 impl Interpreter {
     pub fn new() -> Self {
-        Self {
-            environment: Environment::default(),
+        // Initialize globals
+        let mut environment = Environment::default();
+        for (name, builtin) in get_builtins() {
+            environment.define(Identifier(name.into()), builtin);
         }
+
+        Self { environment }
     }
 
     pub fn interpret(&mut self, prog: Program) {
