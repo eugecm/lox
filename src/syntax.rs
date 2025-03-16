@@ -1,7 +1,10 @@
 use eyre::Context;
 use std::{fmt::Display, iter::Peekable, rc::Rc};
 
-use crate::scanner::{Token, TokenType};
+use crate::{
+    scanner::{Token, TokenType},
+    types::{Identifier, Object},
+};
 
 /// The AST for the program is represented as an enum
 #[derive(Debug)]
@@ -49,7 +52,7 @@ pub enum Expr {
         expr: Box<Expr>,
     },
     Literal {
-        value: Literal,
+        value: Object,
     },
     Logical {
         left: Box<Expr>,
@@ -59,6 +62,11 @@ pub enum Expr {
     Unary {
         op: Token,
         right: Box<Expr>,
+    },
+    Call {
+        callee: Box<Expr>,
+        parens: Token,
+        args: Vec<Expr>,
     },
     Var {
         name: Identifier,
@@ -94,49 +102,22 @@ impl Display for Expr {
                 Display::fmt(&op, f)?;
                 Display::fmt(&right, f)?;
             }
+            Expr::Call {
+                callee,
+                parens: _,
+                args,
+            } => {
+                Display::fmt(&callee, f)?;
+                write!(f, "(")?;
+                for (i, arg) in args.iter().enumerate() {
+                    Display::fmt(&arg, f)?;
+                    if i != args.len() - 1 {
+                        write!(f, ",")?;
+                    }
+                }
+                write!(f, ")")?;
+            }
         }
-        Ok(())
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub struct Identifier(pub Rc<str>);
-
-impl Display for Identifier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        Display::fmt(&self.0, f)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub enum Literal {
-    #[allow(dead_code)]
-    Identifier(Identifier),
-    String(Rc<str>),
-    Number(f64),
-    Boolean(bool),
-    Null, // eww
-}
-
-impl Literal {
-    pub fn is_truthy(&self) -> bool {
-        match self {
-            Literal::Boolean(value) => *value,
-            typ => panic!("invalid non-boolean value {typ:?} evaluated to truthy"),
-        }
-    }
-}
-
-impl Display for Literal {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Literal::Identifier(i) => write!(f, "{i}")?,
-            Literal::String(s) => write!(f, "{s}")?,
-            Literal::Number(n) => write!(f, "{n}")?,
-            Literal::Boolean(n) => write!(f, "{n}")?,
-            Literal::Null => write!(f, "null")?,
-        }
-
         Ok(())
     }
 }
@@ -335,7 +316,7 @@ where
         };
 
         let condition = condition.unwrap_or(Expr::Literal {
-            value: Literal::Boolean(true),
+            value: Object::Boolean(true),
         });
 
         body = Stmt::While {
@@ -445,24 +426,59 @@ where
             };
         }
 
-        self.primary()
+        self.call()
+    }
+
+    fn call(&mut self) -> Expr {
+        let mut expr = self.primary();
+
+        while self.matches(&[TokenType::LeftParen]).is_some() {
+            expr = self.finish_call(expr);
+        }
+
+        expr
+    }
+
+    fn finish_call(&mut self, callee: Expr) -> Expr {
+        let mut args = Vec::new();
+
+        if !self.peek_matches(&[TokenType::RightParen]) {
+            args.push(self.expression());
+            while self.matches(&[TokenType::Comma]).is_some() {
+                args.push(self.expression())
+            }
+        }
+
+        if args.len() > 255 {
+            panic!("can't have more than 255 arguments!")
+        }
+
+        let tok = self
+            .matches(&[TokenType::RightParen])
+            .unwrap_or_else(|| panic!("expected right paren in function call"));
+
+        Expr::Call {
+            callee: Box::new(callee),
+            parens: tok,
+            args,
+        }
     }
 
     fn primary(&mut self) -> Expr {
         let token = self.tokens.next().expect("unexpected end of token stream");
         match token.typ {
             TokenType::False => Expr::Literal {
-                value: Literal::Boolean(false),
+                value: Object::Boolean(false),
             },
             TokenType::True => Expr::Literal {
-                value: Literal::Boolean(true),
+                value: Object::Boolean(true),
             },
             TokenType::Nil => Expr::Literal {
-                value: Literal::Null,
+                value: Object::Null,
             },
 
             TokenType::Number => Expr::Literal {
-                value: Literal::Number(
+                value: Object::Number(
                     token
                         .lexeme
                         .parse()
@@ -471,7 +487,7 @@ where
                 ),
             },
             TokenType::String => Expr::Literal {
-                value: Literal::String(token.lexeme),
+                value: Object::String(token.lexeme),
             },
 
             TokenType::LeftParen => {
@@ -502,11 +518,11 @@ fn test() {
 
     let expr = Expr::Binary {
         left: Box::new(Expr::Literal {
-            value: Literal::Number(1.2),
+            value: Object::Number(1.2),
         }),
         op: Token::new(TokenType::Plus, "+", 0),
         right: Box::new(Expr::Literal {
-            value: Literal::Number(3.4),
+            value: Object::Number(3.4),
         }),
     };
     println!("{expr}");

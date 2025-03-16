@@ -1,7 +1,8 @@
 use crate::{
     environment::Environment,
     eval::eval,
-    syntax::{Declaration, Identifier, Program, Stmt},
+    syntax::{Declaration, Program, Stmt},
+    types::Identifier,
 };
 
 #[derive(Debug)]
@@ -37,7 +38,7 @@ impl Interpreter {
                 else_branch,
             } => {
                 let condition_value = match eval(condition, &mut self.environment) {
-                    crate::syntax::Literal::Boolean(value) => value,
+                    crate::types::Object::Boolean(value) => value,
                     literal => panic!("if condition can only be boolean, got '{literal:?}'"),
                 };
                 if condition_value {
@@ -52,7 +53,7 @@ impl Interpreter {
             }
             Stmt::While { condition, body } => loop {
                 let condition_value = match eval(condition, &mut self.environment) {
-                    crate::syntax::Literal::Boolean(value) => value,
+                    crate::types::Object::Boolean(value) => value,
                     literal => panic!("while condition can only be boolean, got '{literal:?}'"),
                 };
                 if condition_value {

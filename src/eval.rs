@@ -1,12 +1,13 @@
 use crate::{
     environment::Environment,
     scanner::{Token, TokenType},
-    syntax::{Expr, Identifier, Literal},
+    syntax::Expr,
+    types::{Identifier, Object},
 };
 
 // 'a is the lifetime bound to the AST. 'b is the lifetime bound to the source code
 
-pub fn eval(expr: &Expr, env: &mut Environment) -> Literal {
+pub fn eval(expr: &Expr, env: &mut Environment) -> Object {
     match expr {
         Expr::Binary { left, op, right } => eval_binary(left, op, right, env),
         Expr::Grouping { expr } => eval(expr, env),
@@ -15,10 +16,26 @@ pub fn eval(expr: &Expr, env: &mut Environment) -> Literal {
         Expr::Var { name } => eval_var(name, env),
         Expr::Assign { name, expr } => eval_assign(name, expr, env),
         Expr::Logical { left, op, right } => eval_logical(left, op, right, env),
+        Expr::Call {
+            callee,
+            parens,
+            args,
+        } => eval_call(callee, args, env),
     }
 }
 
-fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Literal {
+fn eval_call(callee: &Expr, args: &[Expr], env: &mut Environment) -> Object {
+    let callee = eval(callee, env);
+
+    let arguments: Vec<_> = args.iter().map(|arg| eval(arg, env)).collect();
+
+    let Object::Callable(function) = callee else {
+        panic!("'{callee}' is not callable!")
+    };
+    function.call(&arguments)
+}
+
+fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Object {
     let left = eval(left, env);
 
     if op.typ == TokenType::Or {
@@ -32,16 +49,16 @@ fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) ->
     eval(right, env)
 }
 
-fn eval_literal(value: &Literal) -> Literal {
+fn eval_literal(value: &Object) -> Object {
     value.clone()
 }
 
-fn eval_unary(op: &Token, right: &Expr, env: &mut Environment) -> Literal {
+fn eval_unary(op: &Token, right: &Expr, env: &mut Environment) -> Object {
     match op.typ {
         TokenType::Minus => {
             let sub = eval(right, env);
             match sub {
-                Literal::Number(n) => Literal::Number(-n),
+                Object::Number(n) => Object::Number(-n),
                 _ => panic!("invalid "),
             }
         }
@@ -51,40 +68,40 @@ fn eval_unary(op: &Token, right: &Expr, env: &mut Environment) -> Literal {
     }
 }
 
-fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Literal {
+fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Object {
     let left = eval(left, env);
     let right = eval(right, env);
     match (left, op.typ, right) {
         // Numbers
-        (Literal::Number(left), TokenType::Minus, Literal::Number(right)) => {
-            Literal::Number(left - right)
+        (Object::Number(left), TokenType::Minus, Object::Number(right)) => {
+            Object::Number(left - right)
         }
-        (Literal::Number(left), TokenType::Plus, Literal::Number(right)) => {
-            Literal::Number(left + right)
+        (Object::Number(left), TokenType::Plus, Object::Number(right)) => {
+            Object::Number(left + right)
         }
-        (Literal::Number(left), TokenType::Slash, Literal::Number(right)) => {
-            Literal::Number(left / right)
+        (Object::Number(left), TokenType::Slash, Object::Number(right)) => {
+            Object::Number(left / right)
         }
-        (Literal::Number(left), TokenType::Star, Literal::Number(right)) => {
-            Literal::Number(left * right)
+        (Object::Number(left), TokenType::Star, Object::Number(right)) => {
+            Object::Number(left * right)
         }
-        (Literal::Number(left), TokenType::Greater, Literal::Number(right)) => {
-            Literal::Boolean(left > right)
+        (Object::Number(left), TokenType::Greater, Object::Number(right)) => {
+            Object::Boolean(left > right)
         }
-        (Literal::Number(left), TokenType::GreaterEqual, Literal::Number(right)) => {
-            Literal::Boolean(left >= right)
+        (Object::Number(left), TokenType::GreaterEqual, Object::Number(right)) => {
+            Object::Boolean(left >= right)
         }
-        (Literal::Number(left), TokenType::Less, Literal::Number(right)) => {
-            Literal::Boolean(left < right)
+        (Object::Number(left), TokenType::Less, Object::Number(right)) => {
+            Object::Boolean(left < right)
         }
-        (Literal::Number(left), TokenType::LessEqual, Literal::Number(right)) => {
-            Literal::Boolean(left <= right)
+        (Object::Number(left), TokenType::LessEqual, Object::Number(right)) => {
+            Object::Boolean(left <= right)
         }
-        (left, TokenType::EqualEqual, right) => Literal::Boolean(is_equal(left, right)),
-        (left, TokenType::BangEqual, right) => Literal::Boolean(!is_equal(left, right)),
+        (left, TokenType::EqualEqual, right) => Object::Boolean(is_equal(left, right)),
+        (left, TokenType::BangEqual, right) => Object::Boolean(!is_equal(left, right)),
 
-        (Literal::String(left), TokenType::Plus, Literal::String(right)) => {
-            Literal::String(format!("{left}{right}").into())
+        (Object::String(left), TokenType::Plus, Object::String(right)) => {
+            Object::String(format!("{left}{right}").into())
         }
 
         (left, op, right) => {
@@ -95,25 +112,25 @@ fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> 
     }
 }
 
-fn eval_var(name: &Identifier, env: &Environment) -> Literal {
+fn eval_var(name: &Identifier, env: &Environment) -> Object {
     env.get(name)
         .unwrap_or_else(|| panic!("undefined variable {name}"))
         .clone()
 }
 
-fn eval_assign(name: &Identifier, expr: &Expr, env: &mut Environment) -> Literal {
+fn eval_assign(name: &Identifier, expr: &Expr, env: &mut Environment) -> Object {
     let value = eval(expr, env);
     env.mutate(name, value)
         .unwrap_or_else(|| panic!("undefined {name}"))
         .clone()
 }
 
-fn is_equal(left: Literal, right: Literal) -> bool {
+fn is_equal(left: Object, right: Object) -> bool {
     match (left, right) {
-        (Literal::String(left), Literal::String(right)) => left == right,
-        (Literal::Number(left), Literal::Number(right)) => left == right,
-        (Literal::Boolean(left), Literal::Boolean(right)) => left == right,
-        (Literal::Null, Literal::Null) => true,
+        (Object::String(left), Object::String(right)) => left == right,
+        (Object::Number(left), Object::Number(right)) => left == right,
+        (Object::Boolean(left), Object::Boolean(right)) => left == right,
+        (Object::Null, Object::Null) => true,
         _ => false,
     }
 }
@@ -124,19 +141,20 @@ mod test {
         environment::Environment,
         eval,
         scanner::Scanner,
-        syntax::{Declaration, Literal, Parser, Program, Stmt},
+        syntax::{Declaration, Parser, Program, Stmt},
+        types::Object,
     };
 
     #[test]
     fn test_expressions() {
         let cases = [
-            ("1+1;", Literal::Number(2.)),
-            ("(1+3)*5;", Literal::Number(20.)),
-            ("20 == 14;", Literal::Boolean(false)),
-            ("20 != 14;", Literal::Boolean(true)),
-            (r#""hello" == "hello";"#, Literal::Boolean(true)),
-            (r#""hello" == "hi";"#, Literal::Boolean(false)),
-            (r#""foo" + "bar";"#, Literal::String("foobar".into())),
+            ("1+1;", Object::Number(2.)),
+            ("(1+3)*5;", Object::Number(20.)),
+            ("20 == 14;", Object::Boolean(false)),
+            ("20 != 14;", Object::Boolean(true)),
+            (r#""hello" == "hello";"#, Object::Boolean(true)),
+            (r#""hello" == "hi";"#, Object::Boolean(false)),
+            (r#""foo" + "bar";"#, Object::String("foobar".into())),
         ];
 
         for (expr_str, expected) in cases {

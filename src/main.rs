@@ -8,6 +8,7 @@ mod eval;
 mod interpreter;
 mod scanner;
 mod syntax;
+mod types;
 use interpreter::Interpreter;
 use scanner::Scanner;
 

@@ -1,10 +1,10 @@
 use std::collections::HashMap;
 
-use crate::syntax::{Identifier, Literal};
+use crate::types::{Identifier, Object};
 
 #[derive(Debug)]
 pub struct Environment {
-    stack: Vec<HashMap<Identifier, Literal>>,
+    stack: Vec<HashMap<Identifier, Object>>,
 }
 
 impl Default for Environment {
@@ -28,18 +28,18 @@ impl Environment {
         )
     }
 
-    pub fn define(&mut self, name: Identifier, value: Literal) {
+    pub fn define(&mut self, name: Identifier, value: Object) {
         self.stack
             .last_mut()
             .expect("must have at least 1 environment")
             .insert(name, value);
     }
 
-    pub fn get(&self, name: &Identifier) -> Option<Literal> {
+    pub fn get(&self, name: &Identifier) -> Option<Object> {
         self.stack.iter().rev().find_map(|h| h.get(name).cloned())
     }
 
-    pub fn mutate(&mut self, name: &Identifier, value: Literal) -> Option<Literal> {
+    pub fn mutate(&mut self, name: &Identifier, value: Object) -> Option<Object> {
         let mut name = name.clone();
         for env in self.stack.iter_mut().rev() {
             match env.entry(name) {
