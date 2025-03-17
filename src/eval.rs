@@ -1,5 +1,5 @@
 use crate::{
-    environment::Environment,
+    environment::GlobalScope,
     scanner::{Token, TokenType},
     syntax::Expr,
     types::{Identifier, Object},
@@ -7,7 +7,7 @@ use crate::{
 
 // 'a is the lifetime bound to the AST. 'b is the lifetime bound to the source code
 
-pub fn eval(expr: &Expr, env: &mut Environment) -> Object {
+pub fn eval(expr: &Expr, env: &mut GlobalScope) -> Object {
     match expr {
         Expr::Binary { left, op, right } => eval_binary(left, op, right, env),
         Expr::Grouping { expr } => eval(expr, env),
@@ -24,7 +24,7 @@ pub fn eval(expr: &Expr, env: &mut Environment) -> Object {
     }
 }
 
-fn eval_call(callee: &Expr, args: &[Expr], env: &mut Environment) -> Object {
+fn eval_call(callee: &Expr, args: &[Expr], env: &mut GlobalScope) -> Object {
     let callee = eval(callee, env);
 
     let arguments: Vec<_> = args.iter().map(|arg| eval(arg, env)).collect();
@@ -38,10 +38,10 @@ fn eval_call(callee: &Expr, args: &[Expr], env: &mut Environment) -> Object {
         let n_args = arguments.len();
         panic!("called fn/{arity} with {n_args}");
     }
-    function.call(&arguments)
+    function.call(&mut env, &arguments)
 }
 
-fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Object {
+fn eval_logical(left: &Expr, op: &Token, right: &Expr, env: &mut GlobalScope) -> Object {
     let left = eval(left, env);
 
     if op.typ == TokenType::Or {
@@ -59,7 +59,7 @@ fn eval_literal(value: &Object) -> Object {
     value.clone()
 }
 
-fn eval_unary(op: &Token, right: &Expr, env: &mut Environment) -> Object {
+fn eval_unary(op: &Token, right: &Expr, env: &mut GlobalScope) -> Object {
     match op.typ {
         TokenType::Minus => {
             let sub = eval(right, env);
@@ -74,7 +74,7 @@ fn eval_unary(op: &Token, right: &Expr, env: &mut Environment) -> Object {
     }
 }
 
-fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> Object {
+fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut GlobalScope) -> Object {
     let left = eval(left, env);
     let right = eval(right, env);
     match (left, op.typ, right) {
@@ -118,13 +118,13 @@ fn eval_binary(left: &Expr, op: &Token, right: &Expr, env: &mut Environment) -> 
     }
 }
 
-fn eval_var(name: &Identifier, env: &Environment) -> Object {
+fn eval_var(name: &Identifier, env: &GlobalScope) -> Object {
     env.get(name)
         .unwrap_or_else(|| panic!("undefined variable {name}"))
         .clone()
 }
 
-fn eval_assign(name: &Identifier, expr: &Expr, env: &mut Environment) -> Object {
+fn eval_assign(name: &Identifier, expr: &Expr, env: &mut GlobalScope) -> Object {
     let value = eval(expr, env);
     env.mutate(name, value)
         .unwrap_or_else(|| panic!("undefined {name}"))
@@ -144,7 +144,7 @@ fn is_equal(left: Object, right: Object) -> bool {
 #[cfg(test)]
 mod test {
     use crate::{
-        environment::Environment,
+        environment::GlobalScope,
         eval,
         scanner::Scanner,
         syntax::{Declaration, Parser, Program, Stmt},
@@ -168,7 +168,7 @@ mod test {
             let mut parser = Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
             let ast = parser.parse();
             let Program::Declarations(decls) = ast;
-            let mut env = Environment::default();
+            let mut env = GlobalScope::default();
             for decl in decls {
                 match decl {
                     Declaration::Statement(Stmt::Expr(expr)) => {

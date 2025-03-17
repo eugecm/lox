@@ -1,6 +1,6 @@
 use crate::{
     builtins::get_builtins,
-    environment::Environment,
+    environment::GlobalScope,
     eval::eval,
     syntax::{Declaration, Program, Stmt},
     types::Identifier,
@@ -8,13 +8,13 @@ use crate::{
 
 #[derive(Debug)]
 pub struct Interpreter {
-    environment: Environment,
+    environment: GlobalScope,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         // Initialize globals
-        let mut environment = Environment::default();
+        let mut environment = GlobalScope::default();
         for (name, builtin) in get_builtins() {
             environment.define(Identifier(name.into()), builtin);
         }

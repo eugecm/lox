@@ -4,6 +4,7 @@ use clap::Parser;
 use eyre::Result;
 
 mod builtins;
+mod callable;
 mod environment;
 mod eval;
 mod interpreter;

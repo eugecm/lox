@@ -1,48 +1,42 @@
-use std::collections::HashMap;
+use std::cell::RefCell;
 
-use crate::types::{Identifier, Object};
+use crate::types::{Environment, Identifier, Object, Scope};
 
 #[derive(Debug)]
-pub struct Environment {
-    stack: Vec<HashMap<Identifier, Object>>,
+pub struct GlobalScope {
+    stack: RefCell<Vec<Scope>>,
 }
 
-impl Default for Environment {
+impl Default for GlobalScope {
     fn default() -> Self {
         Self {
-            stack: vec![HashMap::default()],
+            stack: RefCell::new(vec![Scope::default()]),
         }
     }
 }
 
-impl Environment {
-    pub fn push_env(&mut self) {
-        self.stack.push(HashMap::default());
-    }
-
-    pub fn pop_env(&mut self) {
-        self.stack.pop();
-        assert!(
-            !self.stack.is_empty(),
-            "last environment was popped, but that's impossible"
-        )
-    }
-
-    pub fn define(&mut self, name: Identifier, value: Object) {
+impl Environment for GlobalScope {
+    fn define(&self, name: Identifier, value: Object) {
         self.stack
+            .borrow_mut()
             .last_mut()
             .expect("must have at least 1 environment")
+            .borrow_mut()
             .insert(name, value);
     }
 
-    pub fn get(&self, name: &Identifier) -> Option<Object> {
-        self.stack.iter().rev().find_map(|h| h.get(name).cloned())
+    fn get(&self, name: &Identifier) -> Option<Object> {
+        self.stack
+            .borrow()
+            .iter()
+            .rev()
+            .find_map(|h| h.borrow().get(name).cloned())
     }
 
-    pub fn mutate(&mut self, name: &Identifier, value: Object) -> Option<Object> {
+    fn mutate(&self, name: &Identifier, value: Object) -> Option<Object> {
         let mut name = name.clone();
-        for env in self.stack.iter_mut().rev() {
-            match env.entry(name) {
+        for env in self.stack.borrow_mut().iter_mut().rev() {
+            match env.borrow_mut().entry(name) {
                 std::collections::hash_map::Entry::Occupied(mut entry) => {
                     return Some(entry.insert(value))
                 }
@@ -53,5 +47,22 @@ impl Environment {
             }
         }
         None
+    }
+
+    fn push(&self) {
+        self.stack.borrow_mut().push(Scope::default());
+    }
+
+    fn pop(&self) {
+        self.stack.borrow_mut().pop();
+        assert!(
+            !self.stack.borrow().is_empty(),
+            "last environment was popped, but that's impossible"
+        )
+    }
+
+    fn globals(&self) -> Scope {
+        let stack = self.stack.borrow();
+        stack[0].clone()
     }
 }

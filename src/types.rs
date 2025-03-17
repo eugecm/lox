@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
 #[derive(Clone)]
 pub enum Object {
@@ -86,5 +86,16 @@ impl Display for Identifier {
 
 pub trait Callable {
     fn arity(&self) -> usize;
-    fn call(&self, args: &[Object]) -> Object;
+    fn call(&self, env: &Box<dyn Environment>, args: &[Object]) -> Object;
+}
+
+pub type Scope = Rc<RefCell<HashMap<Identifier, Object>>>;
+
+pub trait Environment {
+    fn globals(&self) -> Scope;
+    fn push(&self);
+    fn pop(&self);
+    fn define(&self, name: Identifier, value: Object);
+    fn get(&self, name: &Identifier) -> Option<Object>;
+    fn mutate(&self, name: &Identifier, value: Object) -> Option<Object>;
 }

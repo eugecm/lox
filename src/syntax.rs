@@ -1,5 +1,5 @@
 use eyre::Context;
-use std::{fmt::Display, iter::Peekable, rc::Rc};
+use std::{fmt::Display, iter::Peekable};
 
 use crate::{
     scanner::{Token, TokenType},
@@ -15,15 +15,23 @@ pub enum Program {
 #[derive(Debug, Clone)]
 pub enum Declaration {
     Var {
-        identifier: Rc<str>,
+        identifier: Identifier,
         expression: Expr,
     },
     Statement(Stmt),
 }
 
 #[derive(Debug, Clone)]
+pub struct FunctionStmt {
+    pub identifier: Identifier,
+    pub parameters: Vec<Token>,
+    pub body: Vec<Declaration>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Expr(Expr),
+    Function(FunctionStmt),
     If {
         condition: Expr,
         then_branch: Box<Stmt>,
@@ -178,9 +186,11 @@ where
             let initializer = self.expression();
             self.matches(&[TokenType::Semicolon]).expect("expected ';'");
             Declaration::Var {
-                identifier: name.lexeme,
+                identifier: Identifier(name.lexeme.into()),
                 expression: initializer,
             }
+        } else if let Some(_) = self.matches(&[TokenType::Fun]) {
+            Declaration::Statement(self.function("function"))
         } else {
             let stmt = self.statement();
             Declaration::Statement(stmt)
@@ -508,8 +518,52 @@ where
             TokenType::Identifier => Expr::Var {
                 name: Identifier(token.lexeme),
             },
+            // TokenType::Fun => self.function("function"),
             _ => panic!("primary: unexpected token {token:?}"),
         }
+    }
+
+    fn function(&mut self, kind: &str) -> Stmt {
+        let name = self
+            .matches(&[TokenType::Identifier])
+            .unwrap_or_else(|| panic!("Expected {kind} name."));
+        let _ = self
+            .matches(&[TokenType::LeftParen])
+            .unwrap_or_else(|| panic!("Expected '(' after {kind} name"));
+
+        let mut parameters = Vec::new();
+        if !self.peek_matches(&[TokenType::RightParen]) {
+            loop {
+                if parameters.len() > 255 {
+                    panic!("can't define function with more than 255 params");
+                }
+
+                parameters.push(
+                    self.matches(&[TokenType::Identifier])
+                        .expect("Expected parameter name"),
+                );
+                if self.matches(&[TokenType::Comma]).is_none() {
+                    break;
+                }
+            }
+        }
+        let _ = self
+            .matches(&[TokenType::RightParen])
+            .expect("Expected ')' after parameters");
+
+        // Now consume the body
+        let _ = self
+            .matches(&[TokenType::LeftBrace])
+            .unwrap_or_else(|| panic!("Expected '{{' before {kind} body"));
+        let Stmt::Block(body) = self.block() else {
+            panic!("block should only return Stmt::Block")
+        };
+
+        Stmt::Function(FunctionStmt {
+            identifier: Identifier(name.lexeme),
+            parameters,
+            body,
+        })
     }
 }
 

@@ -3,7 +3,7 @@ use std::{
     time::{SystemTime, UNIX_EPOCH},
 };
 
-use crate::types::{Callable, Object};
+use crate::types::{Callable, Environment, Object};
 
 pub fn get_builtins() -> Vec<(&'static str, Object)> {
     vec![("clock", clock_fn())]
@@ -19,7 +19,7 @@ impl Callable for ClockFn {
         0
     }
 
-    fn call(&self, _: &[crate::types::Object]) -> Object {
+    fn call(&self, _: &Box<dyn Environment>, _: &[crate::types::Object]) -> Object {
         let a = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         Object::Number(a.as_secs_f64())
     }
