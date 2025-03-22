@@ -1,5 +1,7 @@
 use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
 
+use crate::interpreter::Interpreter;
+
 #[derive(Clone)]
 pub enum Object {
     String(Rc<str>),
@@ -86,14 +88,14 @@ impl Display for Identifier {
 
 pub trait Callable {
     fn arity(&self) -> usize;
-    fn call(&self, env: &Box<dyn Environment>, args: &[Object]) -> Object;
+    fn call(&self, interpreter: &mut Interpreter, args: &[Object]) -> Object;
 }
 
 pub type Scope = Rc<RefCell<HashMap<Identifier, Object>>>;
 
 pub trait Environment {
     fn globals(&self) -> Scope;
-    fn push(&self);
+    fn push(&self, scope: Scope);
     fn pop(&self);
     fn define(&self, name: Identifier, value: Object);
     fn get(&self, name: &Identifier) -> Option<Object>;

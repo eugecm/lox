@@ -1,9 +1,10 @@
 use crate::{
+    interpreter::Interpreter,
     syntax::FunctionStmt,
-    types::{Callable, Environment, Identifier, Object},
+    types::{Callable, Identifier, Object, Scope},
 };
 
-struct Function {
+pub struct Function {
     decl: FunctionStmt,
 }
 
@@ -18,9 +19,18 @@ impl Callable for Function {
         self.decl.parameters.len()
     }
 
-    fn call(&self, env: &Box<dyn Environment>, args: &[Object]) -> Object {
+    fn call(&self, interpreter: &mut Interpreter, args: &[Object]) -> Object {
+        let scope = Scope::default();
         for (i, param) in self.decl.parameters.iter().enumerate() {
-            env.define(Identifier(param.lexeme), args[i]);
+            // Should probably create a 'define' in scope
+            scope
+                .borrow_mut()
+                .insert(Identifier(param.lexeme.clone()), args[i].clone());
+        }
+
+        // The "catch" statement
+        match interpreter.execute_block(&self.decl.body, scope) {
+            Ok(x) | Err(x) => x,
         }
     }
 }

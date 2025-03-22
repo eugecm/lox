@@ -7,6 +7,14 @@ pub struct GlobalScope {
     stack: RefCell<Vec<Scope>>,
 }
 
+impl GlobalScope {
+    pub fn empty() -> Self {
+        Self {
+            stack: Default::default(),
+        }
+    }
+}
+
 impl Default for GlobalScope {
     fn default() -> Self {
         Self {
@@ -49,8 +57,8 @@ impl Environment for GlobalScope {
         None
     }
 
-    fn push(&self) {
-        self.stack.borrow_mut().push(Scope::default());
+    fn push(&self, scope: Scope) {
+        self.stack.borrow_mut().push(scope);
     }
 
     fn pop(&self) {

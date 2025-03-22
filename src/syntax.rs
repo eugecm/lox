@@ -38,6 +38,9 @@ pub enum Stmt {
         else_branch: Option<Box<Stmt>>,
     },
     Print(Expr),
+    Return {
+        value: Expr,
+    },
     While {
         condition: Expr,
         body: Box<Stmt>,
@@ -261,6 +264,10 @@ where
             return self.print_statement();
         }
 
+        if self.matches(&[TokenType::Return]).is_some() {
+            return self.return_statement();
+        }
+
         if self.matches(&[TokenType::For]).is_some() {
             return self.for_statement();
         }
@@ -276,6 +283,18 @@ where
         let expr = self.expression();
         self.matches(&[TokenType::Semicolon]).expect("expected ';'");
         Stmt::Expr(expr)
+    }
+
+    fn return_statement(&mut self) -> Stmt {
+        let mut value = Expr::Literal {
+            value: Object::Null,
+        };
+        if !self.peek_matches(&[TokenType::Semicolon]) {
+            value = self.expression();
+        }
+
+        self.matches(&[TokenType::Semicolon]).expect("expected ';'");
+        Stmt::Return { value }
     }
 
     fn for_statement(&mut self) -> Stmt {
