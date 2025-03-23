@@ -1,19 +1,19 @@
-use std::rc::Rc;
+use std::{cell::RefCell, rc::Rc};
 
 use crate::{
     builtins::get_builtins,
     callable::Function,
-    environment::Environment,
+    environment::{EnvRef, Environment},
     scanner::{Token, TokenType},
     syntax::{Declaration, Expr, Program, Stmt},
-    types::{Identifier, Object, Scope},
+    types::{Identifier, Object},
 };
 
 type Flow<T> = Result<T, T>;
 
 #[derive(Debug)]
 pub struct Interpreter {
-    environment: Environment,
+    environment: EnvRef,
 }
 
 impl Interpreter {
@@ -24,7 +24,9 @@ impl Interpreter {
             environment.define(Identifier(name.into()), builtin);
         }
 
-        Self { environment }
+        Self {
+            environment: Rc::new(RefCell::new(environment)),
+        }
     }
 
     pub fn interpret(&mut self, prog: Program) {
@@ -73,10 +75,16 @@ impl Interpreter {
                     return Flow::Ok(Object::Null);
                 };
             },
-            Stmt::Block(decls) => Flow::Ok(self.execute_block(decls, Scope::default())?),
-            Stmt::Function(function_stmt) => {
-                let fun = Object::Callable(Rc::new(Function::new(function_stmt.clone())));
+            Stmt::Block(decls) => Flow::Ok(
+                self.execute_block(decls, Environment::new_ref(Some(self.environment.clone())))?,
+            ),
+            Stmt::FunctionDecl(function_stmt) => {
+                let fun = Object::Callable(Rc::new(Function::new(
+                    function_stmt.clone(),
+                    self.environment.clone(),
+                )));
                 self.environment
+                    .borrow_mut()
                     .define(function_stmt.identifier.clone(), fun);
                 Flow::Ok(Object::Null)
             }
@@ -92,27 +100,30 @@ impl Interpreter {
                 expression,
             } => {
                 let value = self.eval(expression);
-                self.environment.define(identifier.clone(), value);
+                self.environment
+                    .borrow_mut()
+                    .define(identifier.clone(), value);
                 Flow::Ok(Object::Null)
             }
         }
     }
 
-    pub fn execute_block(&mut self, statements: &[Declaration], scope: Scope) -> Flow<Object> {
-        self.environment.push(scope);
+    pub fn execute_block(&mut self, statements: &[Declaration], env: EnvRef) -> Flow<Object> {
+        let prev_env = self.environment.clone();
+        self.environment = env;
 
         let mut last = Object::Null;
         for stmt in statements {
             last = match self.execute(stmt) {
                 Ok(v) => v,
                 Err(v) => {
-                    self.environment.pop();
+                    self.environment = prev_env;
                     return Flow::Err(v);
                 }
             };
         }
 
-        self.environment.pop();
+        self.environment = prev_env;
         Flow::Ok(last)
     }
 
@@ -229,6 +240,7 @@ impl Interpreter {
 
     fn eval_var(&mut self, name: &Identifier) -> Object {
         self.environment
+            .borrow()
             .get(name)
             .unwrap_or_else(|| panic!("undefined variable {name}"))
             .clone()
@@ -237,6 +249,7 @@ impl Interpreter {
     fn eval_assign(&mut self, name: &Identifier, expr: &Expr) -> Object {
         let value = self.eval(expr);
         self.environment
+            .borrow()
             .mutate(name, value)
             .unwrap_or_else(|| panic!("undefined {name}"))
             .clone()

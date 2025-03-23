@@ -31,7 +31,7 @@ pub struct FunctionStmt {
 #[derive(Debug, Clone)]
 pub enum Stmt {
     Expr(Expr),
-    Function(FunctionStmt),
+    FunctionDecl(FunctionStmt),
     If {
         condition: Expr,
         then_branch: Box<Stmt>,
@@ -578,7 +578,7 @@ where
             panic!("block should only return Stmt::Block")
         };
 
-        Stmt::Function(FunctionStmt {
+        Stmt::FunctionDecl(FunctionStmt {
             identifier: Identifier(name.lexeme),
             parameters,
             body,

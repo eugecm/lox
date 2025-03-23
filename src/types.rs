@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap, fmt::Display, rc::Rc};
+use std::{fmt::Display, rc::Rc};
 
 use crate::interpreter::Interpreter;
 
@@ -90,5 +90,3 @@ pub trait Callable {
     fn arity(&self) -> usize;
     fn call(&self, interpreter: &mut Interpreter, args: &[Object]) -> Object;
 }
-
-pub type Scope = Rc<RefCell<HashMap<Identifier, Object>>>;
