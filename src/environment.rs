@@ -1,30 +1,15 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
-use crate::types::{Environment, Identifier, Object, Scope};
+use crate::types::{Identifier, Object, Scope};
 
 #[derive(Debug)]
-pub struct GlobalScope {
-    stack: RefCell<Vec<Scope>>,
+pub struct Environment {
+    parent: Option<Rc<RefCell<Environment>>>,
+    values: HashMap<Identifier, Object>,
 }
 
-impl GlobalScope {
-    pub fn empty() -> Self {
-        Self {
-            stack: Default::default(),
-        }
-    }
-}
-
-impl Default for GlobalScope {
-    fn default() -> Self {
-        Self {
-            stack: RefCell::new(vec![Scope::default()]),
-        }
-    }
-}
-
-impl Environment for GlobalScope {
-    fn define(&self, name: Identifier, value: Object) {
+impl Environment {
+    pub fn define(&self, name: Identifier, value: Object) {
         self.stack
             .borrow_mut()
             .last_mut()
@@ -33,7 +18,7 @@ impl Environment for GlobalScope {
             .insert(name, value);
     }
 
-    fn get(&self, name: &Identifier) -> Option<Object> {
+    pub fn get(&self, name: &Identifier) -> Option<Object> {
         self.stack
             .borrow()
             .iter()
@@ -41,7 +26,7 @@ impl Environment for GlobalScope {
             .find_map(|h| h.borrow().get(name).cloned())
     }
 
-    fn mutate(&self, name: &Identifier, value: Object) -> Option<Object> {
+    pub fn mutate(&self, name: &Identifier, value: Object) -> Option<Object> {
         let mut name = name.clone();
         for env in self.stack.borrow_mut().iter_mut().rev() {
             match env.borrow_mut().entry(name) {
@@ -57,20 +42,23 @@ impl Environment for GlobalScope {
         None
     }
 
-    fn push(&self, scope: Scope) {
+    pub fn push(&self, scope: Scope) {
         self.stack.borrow_mut().push(scope);
     }
 
-    fn pop(&self) {
+    pub fn pop(&self) {
         self.stack.borrow_mut().pop();
         assert!(
             !self.stack.borrow().is_empty(),
             "last environment was popped, but that's impossible"
         )
     }
+}
 
-    fn globals(&self) -> Scope {
-        let stack = self.stack.borrow();
-        stack[0].clone()
+impl Default for Environment {
+    fn default() -> Self {
+        Self {
+            stack: RefCell::new(vec![Scope::default()]),
+        }
     }
 }

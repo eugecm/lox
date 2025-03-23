@@ -92,12 +92,3 @@ pub trait Callable {
 }
 
 pub type Scope = Rc<RefCell<HashMap<Identifier, Object>>>;
-
-pub trait Environment {
-    fn globals(&self) -> Scope;
-    fn push(&self, scope: Scope);
-    fn pop(&self);
-    fn define(&self, name: Identifier, value: Object);
-    fn get(&self, name: &Identifier) -> Option<Object>;
-    fn mutate(&self, name: &Identifier, value: Object) -> Option<Object>;
-}

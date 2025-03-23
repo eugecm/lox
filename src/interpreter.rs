@@ -3,23 +3,23 @@ use std::rc::Rc;
 use crate::{
     builtins::get_builtins,
     callable::Function,
-    environment::GlobalScope,
+    environment::Environment,
     scanner::{Token, TokenType},
     syntax::{Declaration, Expr, Program, Stmt},
-    types::{Environment, Identifier, Object, Scope},
+    types::{Identifier, Object, Scope},
 };
 
 type Flow<T> = Result<T, T>;
 
 #[derive(Debug)]
 pub struct Interpreter {
-    environment: GlobalScope,
+    environment: Environment,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         // Initialize globals
-        let environment = GlobalScope::default();
+        let environment = Environment::default();
         for (name, builtin) in get_builtins() {
             environment.define(Identifier(name.into()), builtin);
         }
@@ -35,10 +35,6 @@ impl Interpreter {
                 }
             }
         }
-    }
-
-    pub fn globals(&self) -> crate::types::Scope {
-        self.environment.globals()
     }
 
     pub fn execute_stmt(&mut self, stmt: &Stmt) -> Flow<Object> {
