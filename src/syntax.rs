@@ -48,7 +48,7 @@ pub enum Stmt {
     Block(Vec<Declaration>),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub enum Expr {
     Assign {
         name: Identifier,

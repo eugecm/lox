@@ -1,4 +1,4 @@
-use std::{fmt::Display, rc::Rc};
+use std::{fmt::Display, hash::Hash, rc::Rc};
 
 use crate::interpreter::Interpreter;
 
@@ -9,6 +9,18 @@ pub enum Object {
     Boolean(bool),
     Callable(Rc<dyn Callable>),
     Null, // eww
+}
+
+impl Hash for Object {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Object::String(s) => Hash::hash(s, state),
+            Object::Number(_) => unimplemented!("hash not implemented for number"),
+            Object::Boolean(b) => Hash::hash(b, state),
+            Object::Callable(_) => unimplemented!("hash not implemented for callable"),
+            Object::Null => Hash::hash("null", state),
+        }
+    }
 }
 
 impl std::fmt::Debug for Object {
@@ -53,6 +65,8 @@ impl PartialEq for Object {
         }
     }
 }
+
+impl Eq for Object {}
 
 impl Object {
     pub fn is_truthy(&self) -> bool {

@@ -8,10 +8,11 @@ use std::{
 use crate::types::{Identifier, Object};
 
 pub type EnvRef = Rc<RefCell<Environment>>;
+pub type Values = Rc<RefCell<HashMap<Identifier, Object>>>;
 
 pub struct Environment {
     pub parent: Option<EnvRef>,
-    values: RefCell<HashMap<Identifier, Object>>,
+    values: Values,
 }
 
 impl Debug for Environment {
@@ -41,6 +42,31 @@ impl Environment {
         }
 
         value
+    }
+
+    pub fn assign_at(&self, distance: usize, name: Identifier, value: Object) {
+        let ancestor: Values = self.ancestor(distance);
+        ancestor.borrow_mut().insert(name, value);
+    }
+
+    pub fn get_at(&self, distance: usize, name: &Identifier) -> Object {
+        let ancestor: Values = self.ancestor(distance);
+        let x = ancestor
+            .borrow()
+            .get(name)
+            .cloned()
+            .unwrap_or_else(|| panic!("could not find {name:?} in scope {ancestor:?}"));
+        x
+    }
+
+    fn ancestor(&self, distance: usize) -> Values {
+        if distance == 0 {
+            return self.values.clone();
+        }
+        self.parent
+            .as_ref()
+            .map(|parent| parent.borrow().ancestor(distance - 1).clone())
+            .unwrap()
     }
 
     pub fn mutate(&self, name: &Identifier, value: Object) -> Option<Object> {

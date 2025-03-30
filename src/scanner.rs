@@ -37,7 +37,7 @@ impl<'a> Scanner<'a> {
     }
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Hash, PartialEq, Eq)]
 pub struct Token {
     pub typ: TokenType,
     pub lexeme: Rc<str>,
@@ -259,7 +259,7 @@ pub fn try_reserved(word: &str) -> Option<TokenType> {
     }
 }
 
-#[derive(Debug, PartialEq, Eq, Copy, Clone)]
+#[derive(Debug, PartialEq, Eq, Copy, Clone, Hash)]
 pub enum TokenType {
     // Single-character tokens.
     LeftParen,

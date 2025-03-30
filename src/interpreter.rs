@@ -1,4 +1,4 @@
-use std::{cell::RefCell, rc::Rc};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     builtins::get_builtins,
@@ -14,18 +14,26 @@ type Flow<T> = Result<T, T>;
 #[derive(Debug)]
 pub struct Interpreter {
     environment: EnvRef,
+    globals: EnvRef,
+    locals: HashMap<Expr, usize>,
 }
 
 impl Interpreter {
     pub fn new() -> Self {
         // Initialize globals
-        let environment = Environment::default();
+        let globals = EnvRef::default();
         for (name, builtin) in get_builtins() {
-            environment.define(Identifier(name.into()), builtin);
+            globals
+                .borrow_mut()
+                .define(Identifier(name.into()), builtin);
         }
 
+        let environment = Environment::new_ref(Some(globals.clone()));
+
         Self {
-            environment: Rc::new(RefCell::new(environment)),
+            globals,
+            environment,
+            locals: HashMap::default(),
         }
     }
 
@@ -133,7 +141,7 @@ impl Interpreter {
             Expr::Grouping { expr } => self.eval(expr),
             Expr::Literal { value } => self.eval_literal(value),
             Expr::Unary { op, right } => self.eval_unary(op, right),
-            Expr::Var { name } => self.eval_var(name),
+            Expr::Var { name } => self.eval_var(name.clone(), expr),
             Expr::Assign { name, expr } => self.eval_assign(name, expr),
             Expr::Logical { left, op, right } => self.eval_logical(left, op, right),
             Expr::Call {
@@ -238,21 +246,36 @@ impl Interpreter {
         }
     }
 
-    fn eval_var(&mut self, name: &Identifier) -> Object {
-        self.environment
-            .borrow()
-            .get(name)
-            .unwrap_or_else(|| panic!("undefined variable {name}"))
-            .clone()
+    fn eval_var(&mut self, name: Identifier, expr: &Expr) -> Object {
+        self.lookup_var(name, expr)
+    }
+
+    pub fn resolve(&mut self, expr: &Expr, depth: usize) {
+        self.locals.insert(expr.clone(), depth);
+    }
+
+    fn lookup_var(&self, name: Identifier, expr: &Expr) -> Object {
+        if let Some(distance) = self.locals.get(expr) {
+            return self.environment.borrow().get_at(*distance, &name);
+        } else {
+            return self.environment.borrow().get(&name).unwrap_or_else(|| {
+                panic!("could not find variable {name:?} in environment nor global scope. locals={:?}, environment={:?}, global={:?}", self.locals, self.environment, self.globals)
+            });
+        }
     }
 
     fn eval_assign(&mut self, name: &Identifier, expr: &Expr) -> Object {
         let value = self.eval(expr);
-        self.environment
-            .borrow()
-            .mutate(name, value)
-            .unwrap_or_else(|| panic!("undefined {name}"))
-            .clone()
+        let distance = self.locals.get(expr);
+        if let Some(distance) = distance {
+            self.environment
+                .borrow()
+                .assign_at(*distance, name.clone(), value.clone());
+        } else {
+            self.globals.borrow().mutate(name, value.clone());
+        }
+
+        value
     }
 }
 

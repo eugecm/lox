@@ -8,10 +8,12 @@ mod callable;
 mod environment;
 mod eval;
 mod interpreter;
+mod resolver;
 mod scanner;
 mod syntax;
 mod types;
 use interpreter::Interpreter;
+use resolver::Resolver;
 use scanner::Scanner;
 
 #[derive(Parser, Debug)]
@@ -34,7 +36,8 @@ fn run_file<P: AsRef<Path>>(input_file: P) -> Result<()> {
     let scanner = Scanner::new(&contents);
     let mut parser = syntax::Parser::new(scanner.scan_tokens().map(|t| t.unwrap()));
     let ast = parser.parse();
-    let mut interpreter = Interpreter::new();
+    let resolver = Resolver::new(Interpreter::new());
+    let mut interpreter = resolver.run(&ast);
     interpreter.interpret(ast);
 
     Ok(())
