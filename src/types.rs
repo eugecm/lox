@@ -11,18 +11,6 @@ pub enum Object {
     Null, // eww
 }
 
-impl Hash for Object {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        match self {
-            Object::String(s) => Hash::hash(s, state),
-            Object::Number(_) => unimplemented!("hash not implemented for number"),
-            Object::Boolean(b) => Hash::hash(b, state),
-            Object::Callable(_) => unimplemented!("hash not implemented for callable"),
-            Object::Null => Hash::hash("null", state),
-        }
-    }
-}
-
 impl std::fmt::Debug for Object {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {

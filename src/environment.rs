@@ -51,11 +51,9 @@ impl Environment {
 
     pub fn get_at(&self, distance: usize, name: &Identifier) -> Object {
         let ancestor: Values = self.ancestor(distance);
-        let x = ancestor
-            .borrow()
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| panic!("could not find {name:?} in scope {ancestor:?}"));
+        let x = ancestor.borrow().get(name).cloned().unwrap_or_else(|| {
+            panic!("could not find {name:?} in scope {ancestor:?} for distance {distance}")
+        });
         x
     }
 

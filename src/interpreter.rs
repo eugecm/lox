@@ -1,11 +1,11 @@
-use std::{cell::RefCell, collections::HashMap, rc::Rc};
+use std::{collections::HashMap, rc::Rc};
 
 use crate::{
     builtins::get_builtins,
     callable::Function,
     environment::{EnvRef, Environment},
     scanner::{Token, TokenType},
-    syntax::{Declaration, Expr, Program, Stmt},
+    syntax::{Declaration, Expr, ExprKind, Program, Stmt},
     types::{Identifier, Object},
 };
 
@@ -15,7 +15,7 @@ type Flow<T> = Result<T, T>;
 pub struct Interpreter {
     environment: EnvRef,
     globals: EnvRef,
-    locals: HashMap<Expr, usize>,
+    locals: HashMap<u64, usize>,
 }
 
 impl Interpreter {
@@ -136,15 +136,15 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Object {
-        match expr {
-            Expr::Binary { left, op, right } => self.eval_binary(left, op, right),
-            Expr::Grouping { expr } => self.eval(expr),
-            Expr::Literal { value } => self.eval_literal(value),
-            Expr::Unary { op, right } => self.eval_unary(op, right),
-            Expr::Var { name } => self.eval_var(name.clone(), expr),
-            Expr::Assign { name, expr } => self.eval_assign(name, expr),
-            Expr::Logical { left, op, right } => self.eval_logical(left, op, right),
-            Expr::Call {
+        match &expr.kind {
+            ExprKind::Binary { left, op, right } => self.eval_binary(left, op, right),
+            ExprKind::Grouping { expr } => self.eval(expr),
+            ExprKind::Literal { value } => self.eval_literal(value),
+            ExprKind::Unary { op, right } => self.eval_unary(op, right),
+            ExprKind::Var { name } => self.eval_var(name.clone(), expr),
+            ExprKind::Assign { name, expr } => self.eval_assign(name, expr),
+            ExprKind::Logical { left, op, right } => self.eval_logical(left, op, right),
+            ExprKind::Call {
                 callee,
                 parens: _,
                 args,
@@ -251,11 +251,11 @@ impl Interpreter {
     }
 
     pub fn resolve(&mut self, expr: &Expr, depth: usize) {
-        self.locals.insert(expr.clone(), depth);
+        self.locals.insert(expr.id, depth);
     }
 
     fn lookup_var(&self, name: Identifier, expr: &Expr) -> Object {
-        if let Some(distance) = self.locals.get(expr) {
+        if let Some(distance) = self.locals.get(&expr.id) {
             return self.environment.borrow().get_at(*distance, &name);
         } else {
             return self.environment.borrow().get(&name).unwrap_or_else(|| {
@@ -266,13 +266,13 @@ impl Interpreter {
 
     fn eval_assign(&mut self, name: &Identifier, expr: &Expr) -> Object {
         let value = self.eval(expr);
-        let distance = self.locals.get(expr);
+        let distance = self.locals.get(&expr.id);
         if let Some(distance) = distance {
             self.environment
                 .borrow()
                 .assign_at(*distance, name.clone(), value.clone());
         } else {
-            self.globals.borrow().mutate(name, value.clone());
+            self.environment.borrow().mutate(name, value.clone());
         }
 
         value

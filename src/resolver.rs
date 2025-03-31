@@ -2,7 +2,7 @@ use std::collections::HashMap;
 
 use crate::{
     interpreter::Interpreter,
-    syntax::{Declaration, Expr, Program, Stmt},
+    syntax::{Declaration, Expr, ExprKind, Program, Stmt},
     types::Identifier,
 };
 
@@ -97,27 +97,27 @@ impl Resolver {
     }
 
     fn resolve_expr(&mut self, expr: &Expr) {
-        match expr {
-            Expr::Assign { name, expr: child } => {
+        match &expr.kind {
+            ExprKind::Assign { name, expr: child } => {
                 self.resolve_expr(child);
                 self.resolve_local(expr, name);
             }
-            Expr::Binary { left, op: _, right } => {
+            ExprKind::Binary { left, op: _, right } => {
                 self.resolve_expr(left);
                 self.resolve_expr(right);
             }
-            Expr::Grouping { expr } => {
+            ExprKind::Grouping { expr } => {
                 self.resolve_expr(expr);
             }
-            Expr::Literal { value: _ } => {}
-            Expr::Logical { left, op: _, right } => {
+            ExprKind::Literal { value: _ } => {}
+            ExprKind::Logical { left, op: _, right } => {
                 self.resolve_expr(left);
                 self.resolve_expr(right);
             }
-            Expr::Unary { op: _, right } => {
+            ExprKind::Unary { op: _, right } => {
                 self.resolve_expr(right);
             }
-            Expr::Call {
+            ExprKind::Call {
                 callee,
                 parens: _,
                 args,
@@ -127,7 +127,7 @@ impl Resolver {
                     self.resolve_expr(arg);
                 }
             }
-            Expr::Var { name } => {
+            ExprKind::Var { name } => {
                 if let Some(false) = self.scopes.last().map(|s| s.get(name).unwrap_or(&true)) {
                     panic!("can't read local var in its own initializer");
                 }
@@ -162,7 +162,8 @@ impl Resolver {
     fn resolve_local(&mut self, expr: &Expr, name: &Identifier) {
         for (i, scope) in self.scopes.iter().enumerate().rev() {
             if scope.contains_key(name) {
-                self.interpreter.resolve(expr, i);
+                let depth = self.scopes.len() - 1 - i;
+                self.interpreter.resolve(expr, depth);
                 return;
             }
         }

@@ -48,8 +48,15 @@ pub enum Stmt {
     Block(Vec<Declaration>),
 }
 
-#[derive(Debug, Clone, Hash, PartialEq, Eq)]
-pub enum Expr {
+#[derive(Debug, Clone)]
+pub struct Expr {
+    /// Unique identifier for this expr in the AST
+    pub id: u64,
+    pub kind: ExprKind,
+}
+
+#[derive(Debug, Clone)]
+pub enum ExprKind {
     Assign {
         name: Identifier,
         expr: Box<Expr>,
@@ -87,34 +94,34 @@ pub enum Expr {
 
 impl Display for Expr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Expr::Binary { left, op, right } => {
+        match &self.kind {
+            ExprKind::Binary { left, op, right } => {
                 Display::fmt(&left, f)?;
                 Display::fmt(&op, f)?;
                 Display::fmt(&right, f)?;
             }
-            Expr::Grouping { expr } => {
+            ExprKind::Grouping { expr } => {
                 write!(f, "(")?;
                 Display::fmt(&expr, f)?;
                 write!(f, ")")?;
             }
-            Expr::Literal { value } => Display::fmt(value, f)?,
-            Expr::Unary { op, right } => {
+            ExprKind::Literal { value } => Display::fmt(value, f)?,
+            ExprKind::Unary { op, right } => {
                 Display::fmt(op, f)?;
                 Display::fmt(right, f)?;
             }
-            Expr::Var { name } => Display::fmt(name, f)?,
-            Expr::Assign { name, expr } => {
+            ExprKind::Var { name } => Display::fmt(name, f)?,
+            ExprKind::Assign { name, expr } => {
                 Display::fmt(name, f)?;
                 write!(f, "=")?;
                 Display::fmt(&expr, f)?;
             }
-            Expr::Logical { left, op, right } => {
+            ExprKind::Logical { left, op, right } => {
                 Display::fmt(&left, f)?;
                 Display::fmt(&op, f)?;
                 Display::fmt(&right, f)?;
             }
-            Expr::Call {
+            ExprKind::Call {
                 callee,
                 parens: _,
                 args,
@@ -141,10 +148,14 @@ macro_rules! binary_expr {
 
             while let Some(op) = self.matches($ops) {
                 let right = self.$right();
-                expr = Expr::Binary {
-                    left: Box::new(expr),
-                    op,
-                    right: Box::new(right),
+                let id = self.get_expr_id();
+                expr = Expr {
+                    id,
+                    kind: ExprKind::Binary {
+                        left: Box::new(expr),
+                        op,
+                        right: Box::new(right),
+                    },
                 }
             }
 
@@ -158,6 +169,7 @@ where
     T: Iterator<Item = Token>,
 {
     tokens: Peekable<T>,
+    expr_counter: u64,
 }
 
 impl<T> Parser<T>
@@ -167,7 +179,14 @@ where
     pub fn new(tokens: T) -> Self {
         Self {
             tokens: tokens.peekable(),
+            expr_counter: 0,
         }
+    }
+
+    fn get_expr_id(&mut self) -> u64 {
+        let old = self.expr_counter;
+        self.expr_counter += 1;
+        old
     }
 
     pub fn parse(&mut self) -> Program {
@@ -210,10 +229,13 @@ where
         if self.matches(&[TokenType::Equal]).is_some() {
             let value = self.assignment();
 
-            if let Expr::Var { name } = expr {
-                return Expr::Assign {
-                    name,
-                    expr: Box::new(value),
+            if let ExprKind::Var { name } = expr.kind {
+                return Expr {
+                    id: self.get_expr_id(),
+                    kind: ExprKind::Assign {
+                        name,
+                        expr: Box::new(value),
+                    },
                 };
             }
 
@@ -229,10 +251,13 @@ where
         while let Some(t) = self.matches(&[TokenType::Or]) {
             let op = t;
             let right = self.and();
-            expr = Expr::Logical {
-                left: Box::new(expr),
-                op,
-                right: Box::new(right),
+            expr = Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Logical {
+                    left: Box::new(expr),
+                    op,
+                    right: Box::new(right),
+                },
             }
         }
 
@@ -245,10 +270,13 @@ where
         while let Some(t) = self.matches(&[TokenType::And]) {
             let op = t;
             let right = self.equality();
-            expr = Expr::Logical {
-                left: Box::new(expr),
-                op,
-                right: Box::new(right),
+            expr = Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Logical {
+                    left: Box::new(expr),
+                    op,
+                    right: Box::new(right),
+                },
             }
         }
 
@@ -286,8 +314,11 @@ where
     }
 
     fn return_statement(&mut self) -> Stmt {
-        let mut value = Expr::Literal {
-            value: Object::Null,
+        let mut value = Expr {
+            id: self.get_expr_id(),
+            kind: ExprKind::Literal {
+                value: Object::Null,
+            },
         };
         if !self.peek_matches(&[TokenType::Semicolon]) {
             value = self.expression();
@@ -345,8 +376,11 @@ where
             body
         };
 
-        let condition = condition.unwrap_or(Expr::Literal {
-            value: Object::Boolean(true),
+        let condition = condition.unwrap_or(Expr {
+            id: self.get_expr_id(),
+            kind: ExprKind::Literal {
+                value: Object::Boolean(true),
+            },
         });
 
         body = Stmt::While {
@@ -450,9 +484,12 @@ where
 
     fn unary(&mut self) -> Expr {
         if let Some(op) = self.matches(&[TokenType::Bang, TokenType::Minus]) {
-            return Expr::Unary {
-                op,
-                right: Box::new(self.unary()),
+            return Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Unary {
+                    op,
+                    right: Box::new(self.unary()),
+                },
             };
         }
 
@@ -487,37 +524,54 @@ where
             .matches(&[TokenType::RightParen])
             .unwrap_or_else(|| panic!("expected right paren in function call"));
 
-        Expr::Call {
-            callee: Box::new(callee),
-            parens: tok,
-            args,
+        Expr {
+            id: self.get_expr_id(),
+            kind: ExprKind::Call {
+                callee: Box::new(callee),
+                parens: tok,
+                args,
+            },
         }
     }
 
     fn primary(&mut self) -> Expr {
         let token = self.tokens.next().expect("unexpected end of token stream");
         match token.typ {
-            TokenType::False => Expr::Literal {
-                value: Object::Boolean(false),
+            TokenType::False => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Literal {
+                    value: Object::Boolean(false),
+                },
             },
-            TokenType::True => Expr::Literal {
-                value: Object::Boolean(true),
+            TokenType::True => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Literal {
+                    value: Object::Boolean(true),
+                },
             },
-            TokenType::Nil => Expr::Literal {
-                value: Object::Null,
+            TokenType::Nil => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Literal {
+                    value: Object::Null,
+                },
             },
-
-            TokenType::Number => Expr::Literal {
-                value: Object::Number(
-                    token
-                        .lexeme
-                        .parse()
-                        .with_context(|| format!("parsing number {token:?}"))
-                        .unwrap(),
-                ),
+            TokenType::Number => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Literal {
+                    value: Object::Number(
+                        token
+                            .lexeme
+                            .parse()
+                            .with_context(|| format!("parsing number {token:?}"))
+                            .unwrap(),
+                    ),
+                },
             },
-            TokenType::String => Expr::Literal {
-                value: Object::String(token.lexeme),
+            TokenType::String => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Literal {
+                    value: Object::String(token.lexeme),
+                },
             },
 
             TokenType::LeftParen => {
@@ -530,12 +584,18 @@ where
                     panic!("expected ')' but found {right_parens}")
                 }
 
-                Expr::Grouping {
-                    expr: Box::new(expr),
+                Expr {
+                    id: self.get_expr_id(),
+                    kind: ExprKind::Grouping {
+                        expr: Box::new(expr),
+                    },
                 }
             }
-            TokenType::Identifier => Expr::Var {
-                name: Identifier(token.lexeme),
+            TokenType::Identifier => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Var {
+                    name: Identifier(token.lexeme),
+                },
             },
             // TokenType::Fun => self.function("function"),
             _ => panic!("primary: unexpected token {token:?}"),
@@ -590,14 +650,23 @@ where
 fn test() {
     use crate::scanner::TokenType;
 
-    let expr = Expr::Binary {
-        left: Box::new(Expr::Literal {
-            value: Object::Number(1.2),
-        }),
-        op: Token::new(TokenType::Plus, "+", 0),
-        right: Box::new(Expr::Literal {
-            value: Object::Number(3.4),
-        }),
+    let expr = Expr {
+        id: 0,
+        kind: ExprKind::Binary {
+            left: Box::new(Expr {
+                id: 1,
+                kind: ExprKind::Literal {
+                    value: Object::Number(1.2),
+                },
+            }),
+            op: Token::new(TokenType::Plus, "+", 0),
+            right: Box::new(Expr {
+                id: 2,
+                kind: ExprKind::Literal {
+                    value: Object::Number(3.4),
+                },
+            }),
+        },
     };
     println!("{expr}");
 }
