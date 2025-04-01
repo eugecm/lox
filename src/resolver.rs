@@ -12,6 +12,7 @@ enum FunctionType {
     Function,
 }
 
+#[derive(Debug)]
 pub struct Resolver {
     interpreter: Interpreter,
     scopes: Vec<HashMap<Identifier, bool>>,

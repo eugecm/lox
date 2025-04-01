@@ -28,7 +28,7 @@ impl Interpreter {
                 .define(Identifier(name.into()), builtin);
         }
 
-        let environment = Environment::new_ref(Some(globals.clone()));
+        let environment = globals.clone();
 
         Self {
             globals,
@@ -258,7 +258,7 @@ impl Interpreter {
         if let Some(distance) = self.locals.get(&expr.id) {
             return self.environment.borrow().get_at(*distance, &name);
         } else {
-            return self.environment.borrow().get(&name).unwrap_or_else(|| {
+            return self.globals.borrow().get(&name).unwrap_or_else(|| {
                 panic!("could not find variable {name:?} in environment nor global scope. locals={:?}, environment={:?}, global={:?}", self.locals, self.environment, self.globals)
             });
         }
