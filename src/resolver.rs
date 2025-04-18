@@ -10,6 +10,7 @@ use crate::{
 enum FunctionType {
     None,
     Function,
+    Method,
 }
 
 #[derive(Debug)]
@@ -97,6 +98,10 @@ impl Resolver {
             Stmt::ClassDecl(class_decl) => {
                 self.declare(class_decl.name.clone());
                 self.define(class_decl.name.clone());
+
+                for method in &class_decl.methods {
+                    self.resolve_function(method, FunctionType::Method);
+                }
             }
         }
     }

@@ -102,7 +102,12 @@ impl Interpreter {
                 self.environment
                     .borrow_mut()
                     .define(class_decl.name.clone(), Object::Null);
-                let class = Class::new(class_decl.name.clone());
+                let mut methods = HashMap::new();
+                for method in &class_decl.methods {
+                    let function = Rc::new(Function::new(method.clone(), self.environment.clone()));
+                    methods.insert(method.identifier.clone(), function);
+                }
+                let class = Class::new(class_decl.name.clone(), methods);
                 self.environment
                     .borrow_mut()
                     .mutate(&class_decl.name, Object::Class(class.into()));

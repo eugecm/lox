@@ -1,3 +1,5 @@
+use std::rc::Rc;
+
 use crate::{
     environment::{EnvRef, Environment},
     interpreter::Interpreter,
@@ -5,6 +7,9 @@ use crate::{
     types::{Callable, Identifier, Object},
 };
 
+pub type FunctionRef = Rc<Function>;
+
+#[derive(Debug, Clone)]
 pub struct Function {
     decl: FunctionStmt,
     closure: EnvRef,

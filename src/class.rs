@@ -1,15 +1,25 @@
 use std::{cell::RefCell, collections::HashMap};
 
-use crate::types::{Callable, Identifier, Object};
+use crate::{
+    callable::FunctionRef,
+    types::{Callable, Identifier, Object},
+};
+
+type Methods = HashMap<Identifier, FunctionRef>;
 
 #[derive(Debug, Clone)]
 pub struct Class {
     pub(crate) name: Identifier,
+    pub(crate) methods: Methods,
 }
 
 impl Class {
-    pub fn new(name: Identifier) -> Self {
-        Self { name }
+    pub fn new(name: Identifier, methods: Methods) -> Self {
+        Self { name, methods }
+    }
+
+    fn find_method(&self, name: &Identifier) -> Option<Object> {
+        self.methods.get(name).cloned().map(|o| Object::Callable(o))
     }
 }
 
@@ -41,11 +51,15 @@ impl ClassInstance {
     }
 
     pub fn get(&self, name: &Identifier) -> Object {
-        self.fields
-            .borrow()
-            .get(name)
-            .cloned()
-            .unwrap_or_else(|| panic!("undefined property '{name}'"))
+        if let Some(field) = self.fields.borrow().get(name).cloned() {
+            return field;
+        }
+
+        if let Some(method) = self.class.find_method(name) {
+            return method;
+        }
+
+        panic!("Undefined property '{name}'")
     }
 
     pub fn set(&self, name: Identifier, value: Object) {
