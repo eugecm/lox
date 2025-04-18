@@ -94,6 +94,10 @@ impl Resolver {
                 self.resolve(declarations);
                 self.end_scope();
             }
+            Stmt::ClassDecl(class_decl) => {
+                self.declare(class_decl.name.clone());
+                self.define(class_decl.name.clone());
+            }
         }
     }
 
@@ -133,6 +137,17 @@ impl Resolver {
                     panic!("can't read local var in its own initializer");
                 }
                 self.resolve_local(expr, name);
+            }
+            ExprKind::Get { name: _, object } => {
+                self.resolve_expr(object);
+            }
+            ExprKind::Set {
+                object,
+                name: _,
+                value,
+            } => {
+                self.resolve_expr(value);
+                self.resolve_expr(object);
             }
         }
     }

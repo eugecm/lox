@@ -3,6 +3,7 @@ use std::{collections::HashMap, rc::Rc};
 use crate::{
     builtins::get_builtins,
     callable::Function,
+    class::Class,
     environment::{EnvRef, Environment},
     scanner::{Token, TokenType},
     syntax::{Declaration, Expr, ExprKind, Program, Stmt},
@@ -97,6 +98,16 @@ impl Interpreter {
                 Flow::Ok(Object::Null)
             }
             Stmt::Return { value } => Flow::Err(self.eval(value)),
+            Stmt::ClassDecl(class_decl) => {
+                self.environment
+                    .borrow_mut()
+                    .define(class_decl.name.clone(), Object::Null);
+                let class = Class::new(class_decl.name.clone());
+                self.environment
+                    .borrow_mut()
+                    .mutate(&class_decl.name, Object::Class(class.into()));
+                Flow::Ok(Object::Null)
+            }
         }
     }
 
@@ -136,7 +147,8 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Object {
-        match &expr.kind {
+        let expr_kind = &expr.kind;
+        match expr_kind {
             ExprKind::Binary { left, op, right } => self.eval_binary(left, op, right),
             ExprKind::Grouping { expr } => self.eval(expr),
             ExprKind::Literal { value } => self.eval_literal(value),
@@ -149,6 +161,12 @@ impl Interpreter {
                 parens: _,
                 args,
             } => self.eval_call(callee, args),
+            ExprKind::Get { name, object } => self.eval_get(name, object),
+            ExprKind::Set {
+                object,
+                name,
+                value,
+            } => self.eval_set(object, name, value),
         }
     }
 
@@ -157,16 +175,22 @@ impl Interpreter {
 
         let arguments: Vec<_> = args.iter().map(|arg| self.eval(arg)).collect();
 
-        let Object::Callable(function) = callee else {
-            panic!("'{callee}' is not callable!")
+        let callable = match callee {
+            Object::Callable(c) => c,
+            Object::Class(c) => c,
+            Object::String(_)
+            | Object::Number(_)
+            | Object::Boolean(_)
+            | Object::ClassInstance(_)
+            | Object::Null => panic!("'{callee}' is not callable"),
         };
 
-        if function.arity() != arguments.len() {
-            let arity = function.arity();
+        if callable.arity() != arguments.len() {
+            let arity = callable.arity();
             let n_args = arguments.len();
             panic!("called fn/{arity} with {n_args}");
         }
-        function.call(self, &arguments)
+        callable.call(self, &arguments)
     }
 
     fn eval_logical(&mut self, left: &Expr, op: &Token, right: &Expr) -> Object {
@@ -275,6 +299,25 @@ impl Interpreter {
             self.environment.borrow().mutate(name, value.clone());
         }
 
+        value
+    }
+
+    fn eval_get(&mut self, name: &Identifier, object: &Expr) -> Object {
+        let obj = self.eval(object);
+        let Object::ClassInstance(ins) = obj else {
+            panic!("only instances have properties");
+        };
+
+        ins.get(name)
+    }
+
+    fn eval_set(&mut self, object: &Expr, name: &Identifier, value: &Expr) -> Object {
+        let obj = self.eval(object);
+        let Object::ClassInstance(ins) = obj else {
+            panic!("only instances have fields");
+        };
+        let value = self.eval(value);
+        ins.set(name.clone(), value.clone());
         value
     }
 }

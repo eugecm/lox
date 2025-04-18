@@ -5,6 +5,7 @@ use eyre::Result;
 
 mod builtins;
 mod callable;
+mod class;
 mod environment;
 mod eval;
 mod interpreter;

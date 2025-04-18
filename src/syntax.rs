@@ -29,9 +29,16 @@ pub struct FunctionStmt {
 }
 
 #[derive(Debug, Clone)]
+pub struct ClassDecl {
+    pub name: Identifier,
+    pub methods: Vec<FunctionStmt>,
+}
+
+#[derive(Debug, Clone)]
 pub enum Stmt {
     Expr(Expr),
     FunctionDecl(FunctionStmt),
+    ClassDecl(ClassDecl),
     If {
         condition: Expr,
         then_branch: Box<Stmt>,
@@ -87,6 +94,15 @@ pub enum ExprKind {
         parens: Token,
         args: Vec<Expr>,
     },
+    Get {
+        name: Identifier,
+        object: Box<Expr>,
+    },
+    Set {
+        object: Box<Expr>,
+        name: Identifier,
+        value: Box<Expr>,
+    },
     Var {
         name: Identifier,
     },
@@ -135,6 +151,16 @@ impl Display for Expr {
                     }
                 }
                 write!(f, ")")?;
+            }
+            ExprKind::Get { name, object } => {
+                write!(f, "{object}.{name}")?;
+            }
+            ExprKind::Set {
+                object,
+                name,
+                value,
+            } => {
+                write!(f, "{object}.{name}={value}")?;
             }
         }
         Ok(())
@@ -213,10 +239,39 @@ where
             }
         } else if let Some(_) = self.matches(&[TokenType::Fun]) {
             Declaration::Statement(self.function("function"))
+        } else if let Some(_) = self.matches(&[TokenType::Class]) {
+            Declaration::Statement(self.class())
         } else {
             let stmt = self.statement();
             Declaration::Statement(stmt)
         }
+    }
+
+    fn class(&mut self) -> Stmt {
+        let Some(name) = self.matches(&[TokenType::Identifier]) else {
+            panic!("invalid syntax: expected identifier")
+        };
+
+        let _ = self
+            .matches(&[TokenType::LeftBrace])
+            .unwrap_or_else(|| panic!("Expected '{{' after class name"));
+
+        let mut methods = Vec::new();
+        while !self.peek_matches(&[TokenType::RightBrace]) {
+            let Stmt::FunctionDecl(decl) = self.function("method") else {
+                panic!("bug: 'function' can only return function declarations")
+            };
+            methods.push(decl);
+        }
+
+        let _ = self
+            .matches(&[TokenType::RightBrace])
+            .unwrap_or_else(|| panic!("Expected '}}' after class body"));
+
+        Stmt::ClassDecl(ClassDecl {
+            name: Identifier(name.lexeme.clone()),
+            methods,
+        })
     }
 
     fn expression(&mut self) -> Expr {
@@ -229,17 +284,28 @@ where
         if self.matches(&[TokenType::Equal]).is_some() {
             let value = self.assignment();
 
-            if let ExprKind::Var { name } = expr.kind {
-                return Expr {
-                    id: self.get_expr_id(),
-                    kind: ExprKind::Assign {
-                        name,
-                        expr: Box::new(value),
-                    },
-                };
+            match expr.kind {
+                ExprKind::Var { name } => {
+                    return Expr {
+                        id: self.get_expr_id(),
+                        kind: ExprKind::Assign {
+                            name,
+                            expr: Box::new(value),
+                        },
+                    };
+                }
+                ExprKind::Get { object, name } => {
+                    return Expr {
+                        id: self.get_expr_id(),
+                        kind: ExprKind::Set {
+                            object,
+                            name,
+                            value: Box::new(value),
+                        },
+                    }
+                }
+                _ => panic!("Invalid assignment target"),
             }
-
-            panic!("Invalid assignment target");
         }
 
         expr
@@ -499,8 +565,23 @@ where
     fn call(&mut self) -> Expr {
         let mut expr = self.primary();
 
-        while self.matches(&[TokenType::LeftParen]).is_some() {
-            expr = self.finish_call(expr);
+        loop {
+            if self.matches(&[TokenType::LeftParen]).is_some() {
+                expr = self.finish_call(expr);
+            } else if self.matches(&[TokenType::Dot]).is_some() {
+                let Some(name) = self.matches(&[TokenType::Identifier]) else {
+                    panic!("Expect property name after '.'")
+                };
+                expr = Expr {
+                    id: self.get_expr_id(),
+                    kind: ExprKind::Get {
+                        name: Identifier(name.lexeme.clone()),
+                        object: Box::new(expr),
+                    },
+                }
+            } else {
+                break;
+            }
         }
 
         expr
