@@ -103,6 +103,9 @@ pub enum ExprKind {
         name: Identifier,
         value: Box<Expr>,
     },
+    This {
+        token: Identifier,
+    },
     Var {
         name: Identifier,
     },
