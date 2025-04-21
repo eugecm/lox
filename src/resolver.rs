@@ -1,6 +1,7 @@
 use std::collections::HashMap;
 
 use crate::{
+    class,
     interpreter::Interpreter,
     syntax::{Declaration, Expr, ExprKind, Program, Stmt},
     types::Identifier,
@@ -113,6 +114,18 @@ impl Resolver {
 
                 self.declare(class_decl.name.clone());
                 self.define(class_decl.name.clone());
+
+                if let Some(superclass) = &class_decl.superclass {
+                    match &superclass.kind {
+                        ExprKind::Var { name } => {
+                            if name.as_ref() == class_decl.name.as_ref() {
+                                panic!("a class can't inherit from itself");
+                            }
+                        }
+                        _ => panic!("bug: superclass is not a var??"),
+                    };
+                    self.resolve_expr(superclass);
+                }
 
                 self.begin_scope();
                 self.scopes

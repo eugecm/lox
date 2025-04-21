@@ -32,6 +32,7 @@ pub struct FunctionStmt {
 pub struct ClassDecl {
     pub name: Identifier,
     pub methods: Vec<FunctionStmt>,
+    pub superclass: Option<Expr>,
 }
 
 #[derive(Debug, Clone)]
@@ -256,6 +257,19 @@ where
             panic!("invalid syntax: expected identifier")
         };
 
+        let superclass = self.matches(&[TokenType::Less]).map(|_| {
+            let Some(name) = self.matches(&[TokenType::Identifier]) else {
+                panic!("invalid syntax: expected superclass name")
+            };
+
+            Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::Var {
+                    name: Identifier(name.lexeme),
+                },
+            }
+        });
+
         let _ = self
             .matches(&[TokenType::LeftBrace])
             .unwrap_or_else(|| panic!("Expected '{{' after class name"));
@@ -275,6 +289,7 @@ where
         Stmt::ClassDecl(ClassDecl {
             name: Identifier(name.lexeme.clone()),
             methods,
+            superclass,
         })
     }
 

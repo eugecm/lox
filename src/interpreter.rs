@@ -100,6 +100,14 @@ impl Interpreter {
             }
             Stmt::Return { value } => Flow::Err(self.eval(value)),
             Stmt::ClassDecl(class_decl) => {
+                let superclass = class_decl.superclass.as_ref().map(|superclass| {
+                    let superclass = self.eval(superclass);
+                    let Object::Class(superclass) = superclass else {
+                        panic!("superclass is not a class!");
+                    };
+                    superclass
+                });
+
                 self.environment
                     .borrow_mut()
                     .define(class_decl.name.clone(), Object::Null);
@@ -112,7 +120,7 @@ impl Interpreter {
                     ));
                     methods.insert(method.identifier.clone(), function);
                 }
-                let class = Class::new(class_decl.name.clone(), methods);
+                let class = Class::new(class_decl.name.clone(), superclass, methods);
                 self.environment
                     .borrow_mut()
                     .mutate(&class_decl.name, Object::Class(class.into()));

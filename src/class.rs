@@ -11,11 +11,16 @@ type Methods = HashMap<Identifier, FunctionRef>;
 pub struct Class {
     pub(crate) name: Identifier,
     pub(crate) methods: Methods,
+    pub(crate) superclass: Option<Rc<Class>>,
 }
 
 impl Class {
-    pub fn new(name: Identifier, methods: Methods) -> Self {
-        Self { name, methods }
+    pub fn new(name: Identifier, superclass: Option<Rc<Class>>, methods: Methods) -> Self {
+        Self {
+            name,
+            superclass,
+            methods,
+        }
     }
 
     fn find_method(&self, name: &Identifier) -> Option<Object> {
