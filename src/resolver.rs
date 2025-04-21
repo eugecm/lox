@@ -10,6 +10,7 @@ use crate::{
 enum FunctionType {
     None,
     Function,
+    Initializer,
     Method,
 }
 
@@ -91,6 +92,9 @@ impl Resolver {
                 if self.current_function == FunctionType::None {
                     panic!("can't return from a top-level function")
                 }
+                if self.current_function == FunctionType::Initializer {
+                    panic!("can't return from an initializer")
+                }
 
                 self.resolve_expr(value);
             }
@@ -117,7 +121,12 @@ impl Resolver {
                     .insert(Identifier("this".into()), true);
 
                 for method in &class_decl.methods {
-                    self.resolve_function(method, FunctionType::Method);
+                    let declaration = if method.identifier.as_ref() == "init" {
+                        FunctionType::Initializer
+                    } else {
+                        FunctionType::Method
+                    };
+                    self.resolve_function(method, declaration);
                 }
 
                 self.end_scope();

@@ -40,7 +40,13 @@ impl Callable for Function {
 
         // The "catch" statement
         let ret_value = match interpreter.execute_block(&self.decl.body, env) {
-            Ok(x) => x,
+            Ok(x) => {
+                if self.is_initializer {
+                    self.closure.borrow().get_at(0, &"this".into())
+                } else {
+                    x
+                }
+            }
             Err(x) => return x,
         };
 

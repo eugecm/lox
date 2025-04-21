@@ -33,3 +33,27 @@ cake.flavor = "German chocolate";
 cake.taste();
 cake.flavor = "Chocolate mint";
 cake.taste();
+
+class Car {
+  init() {
+    this.brand = "BMW";
+  }
+  printBrand() {
+    print this.brand;
+  }
+}
+
+var car = Car();
+car.printBrand();
+
+class Car2 {
+  init(brand) {
+    this.brand = brand;
+  }
+  printBrand() {
+    print this.brand;
+  }
+}
+
+var car = Car2("Ford");
+car.printBrand();
