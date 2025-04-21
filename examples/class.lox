@@ -57,3 +57,18 @@ class Car2 {
 
 var car = Car2("Ford");
 car.printBrand();
+
+class Dog {
+  bark() {
+    print this.sound;
+  }
+}
+
+class Poodle < Dog {
+  init(sound) {
+    this.sound = sound;
+  }
+}
+
+var dog = Poodle("woof");
+dog.bark();

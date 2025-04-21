@@ -24,7 +24,11 @@ impl Class {
     }
 
     fn find_method(&self, name: &Identifier) -> Option<Object> {
-        self.methods.get(name).cloned().map(|o| Object::Callable(o))
+        self.methods
+            .get(name)
+            .cloned()
+            .map(|o| Object::Callable(o))
+            .or_else(|| self.superclass.as_ref().and_then(|s| s.find_method(name)))
     }
 }
 
