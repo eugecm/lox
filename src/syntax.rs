@@ -1,5 +1,5 @@
 use eyre::Context;
-use std::{fmt::Display, iter::Peekable, rc::Rc};
+use std::{fmt::Display, iter::Peekable};
 
 use crate::{
     scanner::{Token, TokenType},

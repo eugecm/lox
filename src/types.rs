@@ -97,6 +97,18 @@ impl Display for Object {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub struct Identifier(pub Rc<str>);
 
+impl From<&str> for Identifier {
+    fn from(value: &str) -> Self {
+        Self(value.into())
+    }
+}
+
+impl AsRef<str> for Identifier {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
 impl Display for Identifier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         Display::fmt(&self.0, f)

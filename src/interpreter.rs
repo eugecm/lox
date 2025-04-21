@@ -91,6 +91,7 @@ impl Interpreter {
                 let fun = Object::Callable(Rc::new(Function::new(
                     function_stmt.clone(),
                     self.environment.clone(),
+                    false,
                 )));
                 self.environment
                     .borrow_mut()
@@ -104,7 +105,11 @@ impl Interpreter {
                     .define(class_decl.name.clone(), Object::Null);
                 let mut methods = HashMap::new();
                 for method in &class_decl.methods {
-                    let function = Rc::new(Function::new(method.clone(), self.environment.clone()));
+                    let function = Rc::new(Function::new(
+                        method.clone(),
+                        self.environment.clone(),
+                        method.identifier.as_ref() == "init",
+                    ));
                     methods.insert(method.identifier.clone(), function);
                 }
                 let class = Class::new(class_decl.name.clone(), methods);

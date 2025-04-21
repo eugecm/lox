@@ -13,11 +13,16 @@ pub type FunctionRef = Rc<Function>;
 pub struct Function {
     decl: FunctionStmt,
     closure: EnvRef,
+    is_initializer: bool,
 }
 
 impl Function {
-    pub fn new(decl: FunctionStmt, closure: EnvRef) -> Self {
-        Self { decl, closure }
+    pub fn new(decl: FunctionStmt, closure: EnvRef, is_initializer: bool) -> Self {
+        Self {
+            decl,
+            closure,
+            is_initializer,
+        }
     }
 }
 
@@ -34,8 +39,15 @@ impl Callable for Function {
         }
 
         // The "catch" statement
-        match interpreter.execute_block(&self.decl.body, env) {
-            Ok(x) | Err(x) => x,
+        let ret_value = match interpreter.execute_block(&self.decl.body, env) {
+            Ok(x) => x,
+            Err(x) => return x,
+        };
+
+        if self.is_initializer {
+            self.closure.borrow().get_at(0, &"this".into())
+        } else {
+            ret_value
         }
     }
 
@@ -45,6 +57,10 @@ impl Callable for Function {
             Identifier("this".into()),
             Object::ClassInstance(instance.clone().into()),
         );
-        Object::Callable(Rc::new(Function::new(self.decl.clone(), env)))
+        Object::Callable(Rc::new(Function::new(
+            self.decl.clone(),
+            env,
+            self.is_initializer,
+        )))
     }
 }

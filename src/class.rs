@@ -25,15 +25,35 @@ impl Class {
 
 impl Callable for Class {
     fn arity(&self) -> usize {
-        0
+        let initializer = self.find_method(&"init".into());
+        match initializer {
+            Some(Object::Callable(t)) => t.arity(),
+            None => 0,
+            Some(e) => panic!("init method must be a callable, got {e} instead"),
+        }
     }
 
     fn call(
         &self,
-        _interpreter: &mut crate::interpreter::Interpreter,
-        _args: &[crate::types::Object],
+        interpreter: &mut crate::interpreter::Interpreter,
+        args: &[crate::types::Object],
     ) -> crate::types::Object {
-        crate::types::Object::ClassInstance(ClassInstance::new(self.clone()).into())
+        let instance = ClassInstance::new(self.clone());
+
+        let initializer = self.find_method(&"init".into());
+        if let Some(initializer) = initializer {
+            let Object::Callable(initializer) = initializer else {
+                panic!("initializer must be a callable function");
+            };
+
+            let Object::Callable(initializer) = initializer.bind(&instance) else {
+                panic!("initializer->bind did not return a callable, this is a bug");
+            };
+
+            initializer.call(interpreter, args);
+        }
+
+        Object::ClassInstance(instance.into())
     }
 
     fn bind(&self, _instance: &ClassInstance) -> Object {
