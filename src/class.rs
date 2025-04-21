@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, rc::Rc};
 
 use crate::{
     callable::FunctionRef,
@@ -35,11 +35,18 @@ impl Callable for Class {
     ) -> crate::types::Object {
         crate::types::Object::ClassInstance(ClassInstance::new(self.clone()).into())
     }
+
+    fn bind(&self, _instance: &ClassInstance) -> Object {
+        unimplemented!("can't call bind on a class")
+    }
 }
 
+pub type ClassInstanceState = Rc<RefCell<HashMap<Identifier, Object>>>;
+
+#[derive(Clone)]
 pub struct ClassInstance {
     pub(crate) class: Class,
-    fields: RefCell<HashMap<Identifier, Object>>,
+    pub(crate) fields: ClassInstanceState,
 }
 
 impl ClassInstance {
@@ -55,8 +62,8 @@ impl ClassInstance {
             return field;
         }
 
-        if let Some(method) = self.class.find_method(name) {
-            return method;
+        if let Some(Object::Callable(method)) = self.class.find_method(name) {
+            return method.bind(&self);
         }
 
         panic!("Undefined property '{name}'")

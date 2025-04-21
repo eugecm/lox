@@ -172,7 +172,7 @@ impl Iterator for Tokens<'_> {
                 }
 
                 // Ignore whitespaces
-                ' ' | '\r' | 't' => {
+                ' ' | '\r' | '\t' => {
                     literal_start = self.cursor;
                     None
                 }

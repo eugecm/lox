@@ -106,4 +106,5 @@ impl Display for Identifier {
 pub trait Callable {
     fn arity(&self) -> usize;
     fn call(&self, interpreter: &mut Interpreter, args: &[Object]) -> Object;
+    fn bind(&self, instance: &ClassInstance) -> Object;
 }

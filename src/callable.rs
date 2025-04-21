@@ -38,4 +38,13 @@ impl Callable for Function {
             Ok(x) | Err(x) => x,
         }
     }
+
+    fn bind(&self, instance: &crate::class::ClassInstance) -> Object {
+        let env = Environment::new_ref(Some(self.closure.clone()));
+        env.borrow_mut().define(
+            Identifier("this".into()),
+            Object::ClassInstance(instance.clone().into()),
+        );
+        Object::Callable(Rc::new(Function::new(self.decl.clone(), env)))
+    }
 }

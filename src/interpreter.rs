@@ -152,8 +152,7 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Object {
-        let expr_kind = &expr.kind;
-        match expr_kind {
+        match &expr.kind {
             ExprKind::Binary { left, op, right } => self.eval_binary(left, op, right),
             ExprKind::Grouping { expr } => self.eval(expr),
             ExprKind::Literal { value } => self.eval_literal(value),
@@ -172,6 +171,7 @@ impl Interpreter {
                 name,
                 value,
             } => self.eval_set(object, name, value),
+            ExprKind::This { token } => self.lookup_var(token.clone(), expr),
         }
     }
 

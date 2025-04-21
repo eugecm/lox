@@ -31,3 +31,5 @@ class Cake {
 var cake = Cake();
 cake.flavor = "German chocolate";
 cake.taste();
+cake.flavor = "Chocolate mint";
+cake.taste();

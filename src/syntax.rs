@@ -1,5 +1,5 @@
 use eyre::Context;
-use std::{fmt::Display, iter::Peekable};
+use std::{fmt::Display, iter::Peekable, rc::Rc};
 
 use crate::{
     scanner::{Token, TokenType},
@@ -165,6 +165,7 @@ impl Display for Expr {
             } => {
                 write!(f, "{object}.{name}={value}")?;
             }
+            ExprKind::This { token: _ } => write!(f, "this")?,
         }
         Ok(())
     }
@@ -681,7 +682,12 @@ where
                     name: Identifier(token.lexeme),
                 },
             },
-            // TokenType::Fun => self.function("function"),
+            TokenType::This => Expr {
+                id: self.get_expr_id(),
+                kind: ExprKind::This {
+                    token: Identifier(token.lexeme),
+                },
+            },
             _ => panic!("primary: unexpected token {token:?}"),
         }
     }

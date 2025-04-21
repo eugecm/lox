@@ -99,9 +99,17 @@ impl Resolver {
                 self.declare(class_decl.name.clone());
                 self.define(class_decl.name.clone());
 
+                self.begin_scope();
+                self.scopes
+                    .last_mut()
+                    .unwrap()
+                    .insert(Identifier("this".into()), true);
+
                 for method in &class_decl.methods {
                     self.resolve_function(method, FunctionType::Method);
                 }
+
+                self.end_scope();
             }
         }
     }
@@ -153,6 +161,9 @@ impl Resolver {
             } => {
                 self.resolve_expr(value);
                 self.resolve_expr(object);
+            }
+            ExprKind::This { token } => {
+                self.resolve_local(expr, token);
             }
         }
     }

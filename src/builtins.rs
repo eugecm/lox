@@ -26,4 +26,8 @@ impl Callable for ClockFn {
         let a = SystemTime::now().duration_since(UNIX_EPOCH).unwrap();
         Object::Number(a.as_secs_f64())
     }
+
+    fn bind(&self, _instance: &crate::class::ClassInstance) -> Object {
+        unimplemented!("can't bind clock")
+    }
 }
