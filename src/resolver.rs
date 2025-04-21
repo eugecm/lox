@@ -19,6 +19,7 @@ enum FunctionType {
 enum ClassType {
     None,
     Class,
+    SubClass,
 }
 
 #[derive(Debug)]
@@ -124,7 +125,16 @@ impl Resolver {
                         }
                         _ => panic!("bug: superclass is not a var??"),
                     };
+                    self.current_class = ClassType::SubClass;
                     self.resolve_expr(superclass);
+                }
+
+                if class_decl.superclass.is_some() {
+                    self.begin_scope();
+                    self.scopes
+                        .last_mut()
+                        .unwrap()
+                        .insert(Identifier("super".into()), true);
                 }
 
                 self.begin_scope();
@@ -143,13 +153,18 @@ impl Resolver {
                 }
 
                 self.end_scope();
+
+                if class_decl.superclass.is_some() {
+                    self.end_scope();
+                }
                 self.current_class = enclosing_class;
             }
         }
     }
 
     fn resolve_expr(&mut self, expr: &Expr) {
-        match &expr.kind {
+        let expr_kind = &expr.kind;
+        match expr_kind {
             ExprKind::Assign { name, expr: child } => {
                 self.resolve_expr(child);
                 self.resolve_local(expr, name);
@@ -201,6 +216,14 @@ impl Resolver {
                     panic!("can't use 'this' keyword outside of a class");
                 }
 
+                self.resolve_local(expr, token);
+            }
+            ExprKind::Super { token, method: _ } => {
+                if self.current_class == ClassType::None {
+                    panic!("can't use 'super' outside of class");
+                } else if self.current_class != ClassType::SubClass {
+                    panic!("can't use 'super' in a class with no superclass");
+                }
                 self.resolve_local(expr, token);
             }
         }

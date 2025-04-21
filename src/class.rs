@@ -23,7 +23,7 @@ impl Class {
         }
     }
 
-    fn find_method(&self, name: &Identifier) -> Option<Object> {
+    pub fn find_method(&self, name: &Identifier) -> Option<Object> {
         self.methods
             .get(name)
             .cloned()

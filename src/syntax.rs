@@ -107,6 +107,10 @@ pub enum ExprKind {
     This {
         token: Identifier,
     },
+    Super {
+        token: Identifier,
+        method: Identifier,
+    },
     Var {
         name: Identifier,
     },
@@ -167,6 +171,7 @@ impl Display for Expr {
                 write!(f, "{object}.{name}={value}")?;
             }
             ExprKind::This { token: _ } => write!(f, "this")?,
+            ExprKind::Super { token: _, method } => write!(f, "super.{method}")?,
         }
         Ok(())
     }
@@ -703,6 +708,23 @@ where
                     token: Identifier(token.lexeme),
                 },
             },
+            TokenType::Super => {
+                let _ = self
+                    .matches(&[TokenType::Dot])
+                    .unwrap_or_else(|| panic!("Expected '.' after 'super'"));
+
+                let method = self
+                    .matches(&[TokenType::Identifier])
+                    .unwrap_or_else(|| panic!("Expected method name after 'super.'"));
+
+                Expr {
+                    id: self.get_expr_id(),
+                    kind: ExprKind::Super {
+                        token: Identifier(token.lexeme),
+                        method: Identifier(method.lexeme),
+                    },
+                }
+            }
             _ => panic!("primary: unexpected token {token:?}"),
         }
     }

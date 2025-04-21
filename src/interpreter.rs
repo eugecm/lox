@@ -111,6 +111,14 @@ impl Interpreter {
                 self.environment
                     .borrow_mut()
                     .define(class_decl.name.clone(), Object::Null);
+
+                if let Some(superclass) = &superclass {
+                    self.environment = Environment::new_ref(Some(self.environment.clone()));
+                    self.environment
+                        .borrow_mut()
+                        .define("super".into(), Object::Class(superclass.clone()));
+                }
+
                 let mut methods = HashMap::new();
                 for method in &class_decl.methods {
                     let function = Rc::new(Function::new(
@@ -120,7 +128,13 @@ impl Interpreter {
                     ));
                     methods.insert(method.identifier.clone(), function);
                 }
-                let class = Class::new(class_decl.name.clone(), superclass, methods);
+                let class = Class::new(class_decl.name.clone(), superclass.clone(), methods);
+
+                if superclass.is_some() {
+                    let parent = self.environment.borrow().parent.clone().unwrap();
+                    self.environment = parent;
+                }
+
                 self.environment
                     .borrow_mut()
                     .mutate(&class_decl.name, Object::Class(class.into()));
@@ -165,7 +179,8 @@ impl Interpreter {
     }
 
     pub fn eval(&mut self, expr: &Expr) -> Object {
-        match &expr.kind {
+        let expr_kind = &expr.kind;
+        match expr_kind {
             ExprKind::Binary { left, op, right } => self.eval_binary(left, op, right),
             ExprKind::Grouping { expr } => self.eval(expr),
             ExprKind::Literal { value } => self.eval_literal(value),
@@ -185,6 +200,27 @@ impl Interpreter {
                 value,
             } => self.eval_set(object, name, value),
             ExprKind::This { token } => self.lookup_var(token.clone(), expr),
+            ExprKind::Super { token: _, method } => {
+                let distance = *self.locals.get(&expr.id).unwrap();
+                let Object::Class(superclass) =
+                    self.environment.borrow().get_at(distance, &"super".into())
+                else {
+                    panic!("bug: environment.get(super) did not return a class")
+                };
+                let Object::ClassInstance(object) = self
+                    .environment
+                    .borrow()
+                    .get_at(distance - 1, &"this".into())
+                else {
+                    panic!("bug: environment.get(this) did not return a class instance");
+                };
+
+                let method = superclass.find_method(method);
+                let Some(Object::Callable(method)) = method else {
+                    panic!("method not found {method:?}");
+                };
+                method.bind(&object)
+            }
         }
     }
 
