@@ -13,11 +13,18 @@ enum FunctionType {
     Method,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum ClassType {
+    None,
+    Class,
+}
+
 #[derive(Debug)]
 pub struct Resolver {
     interpreter: Interpreter,
     scopes: Vec<HashMap<Identifier, bool>>,
     current_function: FunctionType,
+    current_class: ClassType,
 }
 
 impl Resolver {
@@ -26,6 +33,7 @@ impl Resolver {
             interpreter,
             scopes: Default::default(),
             current_function: FunctionType::None,
+            current_class: ClassType::None,
         }
     }
     pub fn run(mut self, prog: &Program) -> Interpreter {
@@ -96,6 +104,9 @@ impl Resolver {
                 self.end_scope();
             }
             Stmt::ClassDecl(class_decl) => {
+                let enclosing_class = self.current_class;
+                self.current_class = ClassType::Class;
+
                 self.declare(class_decl.name.clone());
                 self.define(class_decl.name.clone());
 
@@ -110,6 +121,7 @@ impl Resolver {
                 }
 
                 self.end_scope();
+                self.current_class = enclosing_class;
             }
         }
     }
@@ -163,6 +175,10 @@ impl Resolver {
                 self.resolve_expr(object);
             }
             ExprKind::This { token } => {
+                if self.current_class == ClassType::None {
+                    panic!("can't use 'this' keyword outside of a class");
+                }
+
                 self.resolve_local(expr, token);
             }
         }
